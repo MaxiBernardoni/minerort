@@ -7,6 +7,11 @@
 //   5. Carga/descarga de chunks   (updateChunks)
 // ============================================================
 
+import * as THREE from 'three';
+import { CONFIG, CS, H, BLOCKS, WATER, LEAVES } from './config.js';
+import { hash2, tileUV, atlasTexture, waterTexture } from './textures.js';
+import { scene, shadow } from './scene.js';
+
 // ---------- 1. Ruido ----------
 function valueNoise(x, z, s) {
   const xi = Math.floor(x), zi = Math.floor(z);
@@ -38,8 +43,13 @@ function heightAt(x, z) {
 // ---------- 2. Generacion de chunks ----------
 const chunks = new Map();
 const chunkKey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
+// Chunks modificados que se descargaron: se guardan aca para no perder lo construido al alejarse.
+// Solo en memoria (se pierden al cerrar el juego). Base para el guardado en disco.
+const savedChunks = new Map();
 
 function generateChunk(cx, cz) {
+  const saved = savedChunks.get(chunkKey(cx, cz));
+  if (saved) return { cx, cz, data: saved.data, maxY: saved.maxY, mesh: null, waterMesh: null, meshed: false, modified: true };
   const data = new Uint8Array(CS * H * CS);
   const ch = { cx, cz, data, maxY: 0, mesh: null, waterMesh: null, meshed: false };
   const sea = CONFIG.seaLevel;
@@ -104,8 +114,9 @@ function setBlock(x, y, z, b) {
   if (!ch) return;
   const lx = x & 15, lz = z & 15;
   ch.data[y * 256 + lz * 16 + lx] = b;
+  ch.modified = true;
   if (y > ch.maxY) ch.maxY = y;
-  shadowDirty = true;                      // redibujar sombras
+  shadow.dirty = true;                     // redibujar sombras
   // reconstruir el chunk y los vecinos que comparten borde
   const xs = [ch.cx], zs = [ch.cz];
   if (lx === 0) xs.push(ch.cx - 1); if (lx === 15) xs.push(ch.cx + 1);
@@ -349,6 +360,7 @@ function updateChunks(px, pz, genBudget, meshBudget, msBudget = 4) {
     for (const [k, ch] of chunks) {
       if (Math.max(Math.abs(ch.cx - pcx), Math.abs(ch.cz - pcz)) > R + 2) {
         disposeChunkMeshes(ch);
+        if (ch.modified) savedChunks.set(k, ch);
         chunks.delete(k);
       }
     }
@@ -372,3 +384,8 @@ function updateChunks(px, pz, genBudget, meshBudget, msBudget = 4) {
     if (ready) { buildChunkMesh(ch); m++; }
   }
 }
+
+// Fuerza a recalcular los radios de carga (lo usa quality.js al cambiar la distancia de vision)
+function resetLoadRadius() { genOffsets = null; }
+
+export { chunks, chunkKey, savedChunks, heightAt, getBlock, setBlock, updateChunks, resetLoadRadius, FACES, QUV, waterMaterial, windUniform };

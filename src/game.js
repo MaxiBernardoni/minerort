@@ -2,6 +2,20 @@
 // game.js - Jugador, fisica, controles, interfaz y bucle principal.
 // ============================================================
 
+import * as THREE from 'three';
+import { CONFIG, QUALITY, BLOCKS, CS, H, WATER, isSolidB } from './config.js';
+import { renderer, scene, camera, handScene, handCamera, canvas, sun, applyRenderScale, renderScale } from './scene.js';
+import { chunks, chunkKey, savedChunks, heightAt, getBlock, setBlock, updateChunks } from './world.js';
+import { skyMesh, updateSky, daylight, setTime, skipTime, clockString } from './sky.js';
+import { crackMesh, setCrackStage, hand, startSwing, spawnBreakParticles, updateParticles, updateHand } from './effects.js';
+import { thirdPerson, setThirdPerson, updateCharacter } from './character.js';
+import {
+  inventory, invAdd, heldId, consumeHeld, selected, selectSlot, invOpen, openInventory, closeInventory,
+  hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop,
+} from './inventory.js';
+import { player, mouse, lookDir } from './player.js';
+import { applyQuality } from './quality.js';
+
 // Contorno del bloque apuntado
 const highlight = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
@@ -12,10 +26,6 @@ scene.add(highlight);
 
 // ---------- Jugador ----------
 const W = 0.3, PH = 1.8, EYE = 1.62;           // medio ancho, alto, altura de los ojos
-const player = {
-  pos: new THREE.Vector3(), vel: new THREE.Vector3(),
-  yaw: 0, pitch: 0, onGround: false, fly: false,
-};
 const view = { fov: CONFIG.fov, bobPhase: 0, bobAmt: 0, dip: 0 };   // efectos de camara
 
 function collides(px, py, pz) {
@@ -115,14 +125,8 @@ function raycast(ox, oy, oz, dx, dy, dz, max) {
   }
 }
 
-function lookDir() {
-  const cp = Math.cos(player.pitch);
-  return [-Math.sin(player.yaw) * cp, Math.sin(player.pitch), -Math.cos(player.yaw) * cp];
-}
-
 // ---------- Entrada ----------
 const keys = {};
-const mouse = { left: false, right: false };
 let locked = false, placeCooldown = 0;
 
 window.addEventListener('keydown', e => {
@@ -275,7 +279,7 @@ function frame(now) {
   updateParticles(dt);
   updateDrops(dt);
   updateHand(dt, speedXZ, player.onGround);
-  updateCharacter(dt, speedXZ, player.onGround);
+  updateCharacter(player, dt, speedXZ, player.onGround);
 
   // bajo el agua: niebla azul y corta, sin cielo
   const cx = Math.floor(camera.position.x), cy = Math.floor(camera.position.y), cz = Math.floor(camera.position.z);
@@ -335,7 +339,7 @@ setTimeout(() => {
 }, 30);
 
 // Util para experimentar desde la consola (F12)
-window.mc = { CONFIG, BLOCKS, player, chunks, getBlock, setBlock, heightAt, scene, camera, setTime,
+window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, getBlock, setBlock, heightAt, scene, camera, setTime,
               renderer, spawnBreakParticles, hand, mining, startSwing, selectSlot, sun, mouse,
               applyQuality, applyRenderScale, inventory, invAdd, openInventory, closeInventory, setThirdPerson, drops, spawnDrop, setCreative,
               setLocked: v => { locked = v; } };

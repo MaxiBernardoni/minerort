@@ -2,6 +2,13 @@
 // effects.js - Particulas al romper, grietas, y la mano animada.
 // ============================================================
 
+import * as THREE from 'three';
+import { CONFIG, BLOCKS, isSolidB } from './config.js';
+import { hash2, tileUV, tileAvg, atlasTexture, crackTextures } from './textures.js';
+import { scene, handScene } from './scene.js';
+import { getBlock, FACES, QUV } from './world.js';
+import { daylight } from './sky.js';
+
 // ---------- Particulas (una sola InstancedMesh = 1 draw call) ----------
 const MAX_PARTICLES = 400;
 const particleMesh = new THREE.InstancedMesh(
@@ -161,3 +168,5 @@ function updateHand(dt, speedXZ, onGround) {
   handGroup.rotation.set(0.55 - s * 1.0, 0.5 - s * 0.35, 0);
   handGroup.scale.setScalar(1);
 }
+
+export { spawnBreakParticles, updateParticles, crackMesh, setCrackStage, hand, setHandBlock, startSwing, updateHand, makeBlockGeometry, pixelBox, SKIN, SHIRT };

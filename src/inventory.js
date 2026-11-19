@@ -7,6 +7,15 @@
 //   - Modo creativo: catalogo de todos los bloques, sin gastar bloques.
 // ============================================================
 
+import * as THREE from 'three';
+import { CONFIG, BLOCKS, ITEM_IDS, isSolidB } from './config.js';
+import { makeBlockIcon, atlasTexture } from './textures.js';
+import { scene, camera, canvas } from './scene.js';
+import { getBlock } from './world.js';
+import { daylight } from './sky.js';
+import { setHandBlock, makeBlockGeometry } from './effects.js';
+import { player, mouse, lookDir } from './player.js';
+
 const MAX_STACK = 64;
 const inventory = new Array(36).fill(null);     // cada espacio: null o { id, count }
 let selected = 0;                               // espacio activo de la barra
@@ -333,3 +342,5 @@ toastEl.style.opacity = 0;
 if (!creative) CONFIG.startKit.forEach(([id, n]) => invAdd(id, n));
 else ITEM_IDS.forEach((id, i) => { inventory[i] = { id, count: MAX_STACK }; });
 refreshInventoryUI();
+
+export { inventory, invAdd, heldId, consumeHeld, selected, selectSlot, invOpen, openInventory, closeInventory, hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop };

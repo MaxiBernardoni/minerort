@@ -42,6 +42,8 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 | `src/config.js` | Números ajustables (sombras, hora, velocidad) y la lista de bloques |
 | `src/textures.js` | Texturas de los bloques, agua, grietas e iconos, dibujadas por código |
 | `src/scene.js` | Renderer, cámaras y luces |
+| `src/quality.js` | Presets de calidad (alta / media / baja), tecla K |
+| `src/player.js` | Estado compartido del jugador y del mouse |
 | `src/world.js` | Terreno, agua, árboles, chunks y mallas 3D |
 | `src/sky.js` | Cielo, sol/luna/estrellas, nubes y ciclo de día |
 | `src/effects.js` | Partículas, grietas y el brazo/bloque en primera persona |

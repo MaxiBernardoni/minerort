@@ -1,6 +1,8 @@
 // ============================================================
 // scene.js - Renderer, camaras y luces (sol/luna con sombras).
 // ============================================================
+import * as THREE from 'three';
+import { CONFIG, CS } from './config.js';
 
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: CONFIG.antialias, powerPreference: 'high-performance' });
@@ -9,7 +11,7 @@ renderer.info.autoReset = false;                  // para contar llamadas/triang
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.autoUpdate = false;            // el mapa de sombras se actualiza solo cuando hace falta (sky.js)
 renderer.shadowMap.type = CONFIG.shadowSoft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
-let shadowDirty = true;                           // true = hay que redibujar sombras ya (se rompio/puso un bloque)
+const shadow = { dirty: true };                   // dirty = true: hay que redibujar sombras ya (se rompio/puso un bloque)
 
 // Resolucion de render: 1 = nativa de la pantalla (hasta 2x). La baja el modo adaptativo.
 const maxPixelRatio = Math.min(window.devicePixelRatio, 2);
@@ -22,8 +24,8 @@ function applyRenderScale(s) {
 renderer.setPixelRatio(maxPixelRatio);
 
 const scene = new THREE.Scene();
-let fogFar = (CONFIG.renderDistance - 1) * CS;
-scene.fog = new THREE.Fog(0xaad0ff, fogFar * 0.45, fogFar);
+const fogFar = () => (CONFIG.renderDistance - 1) * CS;   // se deriva de CONFIG, asi sigue al preset de calidad
+scene.fog = new THREE.Fog(0xaad0ff, fogFar() * 0.45, fogFar());
 
 const camera = new THREE.PerspectiveCamera(CONFIG.fov, 1, 0.05, 500);
 camera.rotation.order = 'YXZ';
@@ -56,29 +58,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// Cambia de preset de calidad en caliente (tecla K)
-function applyQuality(name) {
-  const q = QUALITY[name];
-  if (!q) return;
-  const softChanged = CONFIG.shadowSoft !== q.shadowSoft;
-  const leavesChanged = CONFIG.fancyLeaves !== q.fancyLeaves;
-  const rdChanged = CONFIG.renderDistance !== q.renderDistance;
-  Object.assign(CONFIG, q, { quality: name });
+// applyQuality (tecla K) vive en quality.js: necesita world.js y asi evitamos dependencias circulares.
 
-  sun.castShadow = CONFIG.shadows;
-  sun.shadow.mapSize.set(CONFIG.shadowMapSize, CONFIG.shadowMapSize);
-  if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
-  sc.left = sc.bottom = -CONFIG.shadowDistance;
-  sc.right = sc.top = CONFIG.shadowDistance;
-  sc.updateProjectionMatrix();
-  if (softChanged) {
-    renderer.shadowMap.type = CONFIG.shadowSoft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
-    scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
-  }
-  if (rdChanged) {
-    fogFar = (CONFIG.renderDistance - 1) * CS;
-    genOffsets = null;                                  // world.js recalcula los radios
-  }
-  if (leavesChanged) for (const ch of chunks.values()) ch.meshed = false;   // rehacer mallas de a poco
-  shadowDirty = true;
-}
+export { canvas, renderer, scene, camera, handScene, handCamera, hemi, sun, shadow, fogFar, applyRenderScale, renderScale };

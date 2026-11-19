@@ -29,11 +29,11 @@ Preparar el terreno para que el resto no se rompa. No agrega nada visible.
 
 | Tarea | Por qué primero |
 |---|---|
-| **Los cambios al mundo no deben perderse al alejarte.** Guardar en memoria los chunks modificados y no regenerarlos. | Hoy lo construido se borra al alejarse (ver [limitaciones](02-estado-actual.md#limitaciones-conocidas-leídas-del-código)). Guardado y multijugador dependen de esto. |
-| **Migrar de scripts globales a módulos ES** y actualizar Three.js. | Los mods, el multijugador y mantener el código grande lo piden. Hoy `three` está atado a la versión 0.149 por esto (ver [arquitectura](03-arquitectura.md#decisión-clave-scripts-globales-sin-módulos-ni-bundler)). |
+| ✅ **Hecho (2026-11-19).** Los cambios al mundo ya no se pierden al alejarte: los chunks modificados se guardan en memoria (`savedChunks`). | Era la base del guardado y del multijugador. Queda pendiente el guardado en disco (Fase 1) y limitar el uso de memoria. |
+| ✅ **Hecho (2026-11-19): migración a módulos ES.** Ver [arquitectura](03-arquitectura.md#decisión-clave-módulos-es-sin-bundler). | Los mods, el multijugador y mantener el código grande lo piden. **Queda pendiente actualizar Three.js** (hoy 0.149): cambia la iluminación desde r155 y hay que revisar el aspecto del juego; mejor como tarea aparte. |
 | **Agregar una forma mínima de probar** (por ejemplo un script que genere chunks y verifique datos). | Hoy la única verificación es jugar. |
 
-> Decisión abierta: ¿hacer la migración a módulos antes o después de agregar funciones? Hacerla temprano es más barato porque el código todavía es chico (~1.950 líneas).
+> Siguiente de la Fase 0: una forma mínima de probar sin jugar a mano. La migración a módulos se hizo temprano, con el código chico (~1.950 líneas), que es cuando sale más barata.
 
 ### Fase 1 · Persistencia y base de supervivencia
 

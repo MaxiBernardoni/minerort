@@ -1,7 +1,7 @@
 # 02 · Estado actual
 
 > Última revisión: 2026-11-19 · Corresponde al commit `e69a868` (versión 0.1.0).
-> Esta lista sale de leer el código. **Nada de esto fue probado jugando durante la redacción**, así que ver "Pendientes de verificar" al final.
+> La lista sale de leer el código y se comprobó con pruebas automáticas el 2026-11-19 (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)). Falta lo que depende de un humano; ver "Pendientes de verificar" al final.
 
 ## Resumen
 
@@ -28,7 +28,7 @@ F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estad
 | Tamaño | Infinito en X y Z. Altura fija de 64 bloques. |
 | Chunks | Bloques de 16×64×16. Se generan y descargan según la distancia del jugador (6 chunks de radio en calidad media). |
 | Capas | Césped arriba, 3 capas de tierra, piedra abajo. Arena en lugar de césped/tierra en la costa. |
-| Agua | Lagos y mar hasta la altura 26. Translúcida y animada. No fluye. |
+| Agua | Lagos poco profundos (máximo 6 bloques, ~15% del terreno) hasta la altura 26. Translúcida y animada. No fluye. |
 | Árboles | Aleatorios y reproducibles (misma semilla = mismos árboles). Troncos de 4 a 5 bloques y copa de hojas. |
 | Bloques | 10 tipos: césped, tierra, piedra, madera, hojas, arena, tablones, ladrillo, adoquín y agua. |
 
@@ -64,7 +64,7 @@ Lista completa de teclas en el [README principal](../README.md#controles).
 
 Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.md):
 
-- **Guardado y carga de mundos.** Ver también la limitación importante más abajo.
+- **Guardado y carga de mundos en disco.** Los cambios sí se conservan en memoria durante la sesión; ver la limitación #1 más abajo.
 - Crafteo, herramientas y durabilidad.
 - Mobs, vida, hambre, daño de caída.
 - Cuevas, minerales, biomas, estructuras.
@@ -77,7 +77,7 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 
 ## Limitaciones conocidas (leídas del código)
 
-1. **Los cambios al mundo se pierden al alejarte.** Los chunks lejanos se borran de la memoria y, al volver, se regeneran desde la semilla. Esto afecta a lo que construís aunque no cierres el juego. Es lo primero que habría que resolver antes del guardado y del multijugador.
+1. **Los cambios al mundo se pierden al cerrar el juego.** Mientras jugás se conservan aunque te alejes (los chunks modificados se guardan en memoria en `savedChunks`, ver [03-arquitectura.md](03-arquitectura.md)), pero no hay guardado en disco. Además esa memoria crece con cada chunk modificado y no se limpia.
 2. **El agua no fluye.** Es solo relleno hasta el nivel del mar. Romper un bloque junto al agua no la deja entrar.
 3. **El terreno es solo un mapa de alturas.** Por eso no hay cuevas ni salientes: cada columna tiene una única superficie.
 4. **La generación de chunks corre en el hilo principal.** Hay un presupuesto por frame para no trabar, pero a mayor distancia de visión puede haber tirones.
@@ -87,20 +87,31 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 
 ## Pendientes de verificar
 
-**Max jugó poco el juego y no vio bugs hasta ahora**, pero eso no equivale a que no haya: no hubo una prueba sistemática. Tampoco se midió el rendimiento. Todo lo de este documento sale de leer el código.
+El 2026-11-19 se hizo una primera ronda de pruebas automáticas (detalle en [06-checklist-pruebas.md](06-checklist-pruebas.md)). Max jugó poco y no había visto bugs. Quedan sin probar a mano las cosas que dependen de un humano y de la app real:
 
-- [ ] Una sesión de prueba: recorrer cada función de la lista de arriba y marcar cuál anda y cuál no. Se puede pedir a la IA que arme el checklist.
-- [ ] Medir FPS en cada preset de calidad, en al menos una PC modesta (el requisito está en [01-vision.md](01-vision.md#requisito-de-rendimiento)).
-- [ ] Anotar acá cualquier bug que aparezca, con fecha y cómo reproducirlo.
+- [ ] Mirar con el mouse y la pausa con Esc (necesitan el bloqueo de puntero).
+- [ ] Correr con `npm start` (las pruebas se hicieron en un navegador, no en la ventana de Electron).
+- [ ] Medir FPS reales en una PC modesta (el requisito está en [01-vision.md](01-vision.md#requisito-de-rendimiento)).
+- [ ] Sensación de juego: si el movimiento, el ritmo de romper y el alcance se sienten bien.
 
 ### Bugs conocidos
 
-Ninguno registrado todavía.
+Ninguno funcional encontrado en la primera ronda. Observaciones:
+
+1. **La resolución adaptativa puede quedarse baja para siempre.** Apunta a 58 FPS fijos (`targetFPS`). En una ventana limitada a 30 FPS el juego bajó solo hasta el 55–60% y no volvió a subir. Una pantalla de 50 Hz o un escritorio remoto podrían tener el mismo efecto. Es de severidad baja y no está confirmado en una PC real.
+2. **El agua es poco profunda y rara.** El README y las secciones anteriores hablan de "lagos y mar", pero con las alturas actuales (mínimo 20, nivel del mar 26) el agua tiene como máximo 6 bloques de profundidad y es ~15% de las columnas. No se rompe nada: es una limitación del terreno.
+3. ~~Los cambios al mundo se perdían al alejarse.~~ **Resuelto** el 2026-11-19: ahora se conservan durante la sesión. Siguen perdiéndose al cerrar el juego (limitación #1).
+4. **Electron muestra un aviso de seguridad** porque la página no define una política de contenido (CSP). No afecta al juego hoy; conviene resolverlo antes del instalador y de los mods.
 
 ### Rendimiento medido
 
-Sin datos todavía. Tabla a completar:
-
-| Fecha | PC (CPU / GPU / RAM) | Preset | FPS aprox. | Notas |
+| Fecha | PC | Preset | Resultado | Notas |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| 2026-11-19 | RTX 3070, ventana de 1024×768 | baja | ~1.5 ms por cuadro | Mediana de 40 cuadros forzando la sincronización con la GPU. |
+| 2026-11-19 | ídem | media | ~2.9 ms por cuadro | Sombras actualizadas en cada cuadro (peor caso). |
+| 2026-11-19 | ídem | alta | ~2.8 ms por cuadro | Ídem. |
+
+- Esta GPU es potente, así que **no dice nada sobre una PC modesta**: el requisito sigue sin medirse.
+- Los FPS que mostró el juego (30) no son confiables: el navegador integrado limita los cuadros a ~30 por segundo.
+- Al viajar a una zona nueva (225 chunks cargados) no hubo tirones: el peor cuadro duró 34 ms.
+- Presets: `baja` dibuja unas 80 llamadas y 64k triángulos, `media` 144 y 132k, `alta` 160 y 255k.

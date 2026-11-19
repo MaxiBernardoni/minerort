@@ -9,6 +9,7 @@
 | [03-arquitectura.md](03-arquitectura.md) | ¿Cómo está armado el código y cómo se conecta cada pieza? |
 | [04-roadmap.md](04-roadmap.md) | ¿Qué se quiere construir y en qué orden? |
 | [05-proceso-vibecoding.md](05-proceso-vibecoding.md) | ¿Cómo se trabaja con la IA y entre dispositivos? Reglas y plantillas. |
+| [06-checklist-pruebas.md](06-checklist-pruebas.md) | ¿Qué se probó, qué anda y qué falta probar? |
 | [bitacora/](bitacora/) | ¿Qué se hizo en cada sesión? Un archivo por sesión, con prompts y lecciones. |
 
 Además, [`CLAUDE.md`](../CLAUDE.md) en la raíz es lo que Claude Code lee solo al empezar cada sesión.

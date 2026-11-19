@@ -4,6 +4,10 @@
 // En tercera persona (tecla V) se ve caminando, mirando y golpeando.
 // ============================================================
 
+import * as THREE from 'three';
+import { scene } from './scene.js';
+import { pixelBox, hand, SKIN, SHIRT } from './effects.js';
+
 const PIX = 0.05625;                      // 1 "pixel" del modelo = 1.8 / 32
 const HAIR = [0.28, 0.18, 0.10], PANTS = [0.22, 0.24, 0.52], SHOE = [0.30, 0.30, 0.34];
 const charMaterials = [];
@@ -68,7 +72,7 @@ setThirdPerson(false);
 
 // ---------- animacion ----------
 let walkPhase = 0, walkAmt = 0;
-function updateCharacter(dt, speedXZ, onGround) {
+function updateCharacter(player, dt, speedXZ, onGround) {
   charRoot.position.set(player.pos.x, player.pos.y, player.pos.z);
   charRoot.rotation.y = player.yaw;
 
@@ -86,3 +90,5 @@ function updateCharacter(dt, speedXZ, onGround) {
   armR.rotation.z = -0.15 * s;
   head.rotation.x = player.pitch * 0.9;
 }
+
+export { thirdPerson, setThirdPerson, updateCharacter };

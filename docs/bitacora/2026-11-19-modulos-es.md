@@ -1,0 +1,24 @@
+# Sesión 2026-11-19 · Migración a módulos ES
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** pasar el código de scripts globales a módulos ES, segunda tarea de la Fase 0 del roadmap, sin cambiar cómo se ve ni cómo juega.
+- **Prompt(s) clave:** *"Sí, módulos ES"*, como respuesta a la pregunta "¿seguimos con módulos ES o con el guardado en disco?". Antes la IA había recomendado esta opción y explicado por qué (es más barata ahora y habilita Three.js nuevo, mods y multijugador).
+- **Resultado:** los 9 archivos de `src/` ahora importan y exportan lo que usan, `index.html` carga solo `src/game.js` con un import map para `three`, y se agregaron `src/player.js` y `src/quality.js`. Probado en el navegador y en Electron real. Commit: *(pendiente)*.
+- **Decisiones de diseño que tomó la IA:**
+  - Evitar dependencias circulares. Para eso `player`, `mouse` y `lookDir` salieron de `game.js` a `player.js`, y `applyQuality` salió de `scene.js` a `quality.js`. `updateCharacter` recibe `player` por parámetro.
+  - Un módulo no puede reasignar lo que importa, así que `shadowDirty` pasó a `shadow.dirty`, `fogFar` a una función `fogFar()` que se calcula desde `CONFIG`, y `genOffsets = null` a `resetLoadRadius()`.
+  - Three.js se queda en 0.149 (el build de módulo). Subirlo cambia la iluminación y es un paso aparte.
+- **Qué funcionó:**
+  - Armar primero el mapa de quién usa qué antes de editar evitó los ciclos y los errores típicos.
+  - Repetir la misma batería de pruebas de la sesión de pruebas dio resultados idénticos, que es la mejor señal de que no se rompió nada.
+  - Probar en el Electron real con un script temporal que imprime los errores de consola.
+- **Qué falló o hubo que corregir:**
+  - El navegador integrado volvió a quedar oculto durante una prueba y no corrían los cuadros; hubo que mostrar el panel.
+  - Un comando que armé mal quedó colgado y hubo que detenerlo.
+  - La IA intentó usar eslint con `npx` para detectar nombres sin importar, pero el sistema bloqueó la descarga. Se reemplazó por búsqueda a mano y por ejecutar las rutas del juego. Es una cobertura menor: ver "Regresión tras la migración" en [06-checklist-pruebas.md](../06-checklist-pruebas.md).
+- **Lección:** en un refactor grande sin tests, **la prueba es repetir exactamente lo que ya se había probado antes** y comparar. Por eso conviene dejar escritas las pruebas (ahora hay un checklist) y no solo hacerlas una vez.
+- **Quedó pendiente:**
+  - [ ] Probar a mano con `npm start` las rutas que la batería no tocó: efecto bajo el agua, modo creativo, tirar objetos y rueda del mouse.
+  - [ ] Convertir la batería de pruebas en un script que se pueda correr sola (siguiente tarea de la Fase 0). Hoy un error de "se me olvidó importar algo" solo aparece al pasar por esa línea.
+  - [ ] Actualizar Three.js a una versión nueva, revisando cómo cambia la luz.
+  - [ ] Definir una política de contenido (CSP) para quitar el aviso de seguridad de Electron.

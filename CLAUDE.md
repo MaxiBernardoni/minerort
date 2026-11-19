@@ -35,15 +35,17 @@ F12 abre la consola. `window.mc` expone el estado del juego.
 
 ## Convenciones del código
 
-- **Scripts globales, sin `import`/`export` ni bundler.** El orden en `index.html` importa: un archivo solo usa lo definido antes.
-- **`three` está fijado en 0.149.0** a propósito (se carga `build/three.min.js`, que las versiones nuevas eliminaron). No lo actualices sin migrar antes a módulos ES.
-- Un archivo por responsabilidad (mapa en [docs/03-arquitectura.md](docs/03-arquitectura.md)). Si agregás un archivo, ubicalo en `index.html` después de los que necesita.
+- **Módulos ES, sin bundler.** Cada archivo de `src/` importa lo que usa (`import`) y exporta lo que otros necesitan en un `export { … }` al final. `game.js` es la entrada (`index.html` solo carga ese). No hay globales: `THREE` se importa con `import * as THREE from 'three'`.
+- **Sin dependencias circulares.** Un archivo importa solo de los "más abajo" en el grafo de [docs/03-arquitectura.md](docs/03-arquitectura.md#grafo-de-dependencias). Un módulo no puede reasignar lo que importa: usá un objeto (`shadow.dirty`) o una función.
+- **`three` está fijado en 0.149.0** (se importa `three.module.js` con un import map en `index.html`). No lo actualices por tu cuenta: desde r155 cambia la iluminación y hay que revisarlo mirando el juego.
+- Un archivo por responsabilidad (mapa en [docs/03-arquitectura.md](docs/03-arquitectura.md)). Un archivo nuevo se usa agregando el `import` donde se necesite; no hay que tocar `index.html`.
 - Los valores ajustables van en `src/config.js`. Los bloques están definidos por datos en `BLOCKS`.
 - Comentarios en español, breves. No agregues dependencias nuevas sin preguntarle a Max.
 - Texturas y modelos se dibujan por código; no se agregan imágenes externas.
 
 ## Limitaciones conocidas que afectan a cualquier cambio
 
-- Los cambios al mundo **se pierden** cuando el chunk se descarga (se regenera desde la semilla). No hay guardado.
+- Los cambios al mundo se conservan en memoria (`savedChunks` en `world.js`) pero **se pierden al cerrar el juego**: no hay guardado en disco.
+- Para probar en el navegador integrado, el panel tiene que estar visible; si está oculto no corren los cuadros.
 - La generación de chunks corre en el hilo principal.
 - No hay tests: la verificación es jugar. Si no podés probarlo en el juego, decilo en vez de afirmar que anda.

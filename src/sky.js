@@ -3,6 +3,12 @@
 // updateSky(dt) se llama en cada frame y ajusta cielo, niebla y luces.
 // ============================================================
 
+import * as THREE from 'three';
+import { CONFIG } from './config.js';
+import { lerp, smooth, tn, waterTexture } from './textures.js';
+import { scene, camera, renderer, sun, hemi, shadow, fogFar } from './scene.js';
+import { waterMaterial, windUniform } from './world.js';
+
 // ---------- Domo del cielo (shader) ----------
 const skyUniforms = {
   uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() },
@@ -113,7 +119,7 @@ function updateSky(dt) {
   skyUniforms.uTime.value = skyTime;
   skyMesh.position.copy(camera.position);
   scene.fog.color.setRGB(...hor);
-  scene.fog.near = fogFar * 0.45; scene.fog.far = fogFar;
+  scene.fog.near = fogFar() * 0.45; scene.fog.far = fogFar();
   renderer.setClearColor(scene.fog.color);
 
   // sol de dia, luna de noche (una sola luz direccional)
@@ -150,8 +156,10 @@ function updateSky(dt) {
 
   // el mapa de sombras no se redibuja en todos los frames (es lo mas caro del render)
   shadowTick++;
-  if (sun.castShadow && (shadowDirty || shadowTick % Math.max(1, CONFIG.shadowUpdateEvery) === 0)) {
+  if (sun.castShadow && (shadow.dirty || shadowTick % Math.max(1, CONFIG.shadowUpdateEvery) === 0)) {
     renderer.shadowMap.needsUpdate = true;
-    shadowDirty = false;
+    shadow.dirty = false;
   }
 }
+
+export { skyMesh, updateSky, daylight, setTime, skipTime, clockString };

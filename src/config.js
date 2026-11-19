@@ -79,3 +79,5 @@ const ITEM_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 // Reglas de colision y de dibujado
 const isSolidB = b => b !== 0 && b !== WATER;                 // se puede chocar / apuntar
 const isOpaque = b => b !== 0 && b !== LEAVES && b !== WATER; // tapa las caras vecinas
+
+export { CONFIG, QUALITY, CS, H, BLOCKS, WATER, LEAVES, ITEM_IDS, isSolidB, isOpaque };

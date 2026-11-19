@@ -4,6 +4,9 @@
 // Todas las texturas "tileables" usan ruido que se repite, asi no se notan los bordes.
 // ============================================================
 
+import * as THREE from 'three';
+import { BLOCKS } from './config.js';
+
 const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 11;
 
 const atlasCanvas = document.createElement('canvas');
@@ -230,3 +233,5 @@ function makeBlockIcon(id) {
   poly([[32, 32], [60, 18], [60, 46], [32, 60]], 'rgba(0,0,0,0.45)');
   return c;
 }
+
+export { hash2, lerp, smooth, tn, tileUV, tileAvg, atlasTexture, waterTexture, crackTextures, makeBlockIcon };

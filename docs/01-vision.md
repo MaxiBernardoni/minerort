@@ -34,7 +34,7 @@ Qué implica esta regla:
 ## Herramientas
 
 - **IA:** solo Claude Code (app de escritorio). No se usan otros modelos ni chats externos.
-- **Motor:** Electron 33 y Three.js 0.149 (cargado como script global, sin bundler).
+- **Motor:** Electron 33 y Three.js 0.149 (módulos ES con import map, sin bundler).
 - **Plataforma objetivo:** Windows.
 
 ## Meta final
