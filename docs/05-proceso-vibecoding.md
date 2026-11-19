@@ -36,7 +36,7 @@ El proyecto se hace en **muchas sesiones de Claude Code, en varios dispositivos*
 - **Nunca editar la bitácora de otra sesión**, salvo para completar datos pendientes.
 - **Si aparece un conflicto de git,** que la IA lo resuelva leyendo ambos lados, no eligiendo uno a ciegas.
 
-> Estado de la sincronización al 2026-11-19: el repositorio tiene un remoto (`origin`, GitHub) pero `main` **todavía no está publicado ahí**. Hay que hacer el primer `git push` antes de trabajar desde otro dispositivo.
+> Estado de la sincronización al 2026-11-19: `main` está publicado en GitHub (`origin`). En otro dispositivo, clonar el repo y correr `npm install`. Git avisó que el repositorio se movió a `https://github.com/MaxiBernardoni/minerort.git`; el remoto viejo todavía funciona, pero conviene actualizarlo.
 
 ## Cómo registrar una sesión
 
