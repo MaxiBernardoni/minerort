@@ -18,7 +18,7 @@
 - **Lección:** al pedir documentación, conviene contar de entrada **cómo se va a trabajar** (cuántos dispositivos, cuántas sesiones, quién lee), porque cambia la estructura de lo que se escribe. Y las respuestas "lo que sea mejor" delegan una decisión: está bien, pero hay que revisarla después.
 - **Quedó pendiente:**
   - [x] Commit de la documentación (`f10127a`) y primer `git push`: hecho.
-  - [ ] Actualizar la URL del remoto a la nueva ubicación del repo (`MaxiBernardoni/minerort`).
+  - [x] URL del remoto actualizada a la nueva ubicación del repo (`MaxiBernardoni/minerort`) en esta PC. En otros dispositivos, clonar con la URL nueva.
   - [ ] Max revisa los documentos y corrige lo que no refleje lo que quiere.
   - [ ] Max sube el historial de la versión inicial (ver [000-version-inicial.md](000-version-inicial.md)).
   - [ ] Una sesión de prueba del juego para llenar "Bugs conocidos" y "Rendimiento medido" en [02-estado-actual.md](../02-estado-actual.md).
