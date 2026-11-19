@@ -22,7 +22,7 @@ Clon de Minecraft en Electron + Three.js, hecho como experimento de aprendizaje 
    - función nueva o quitada → `docs/02-estado-actual.md` y `docs/04-roadmap.md`
    - estructura del código, orden de scripts o datos → `docs/03-arquitectura.md`
 2. Creá `docs/bitacora/AAAA-MM-DD-tema.md` con la plantilla de [docs/05-proceso-vibecoding.md](docs/05-proceso-vibecoding.md). Es un archivo nuevo por sesión: **no edites la bitácora de otras sesiones** (evita conflictos entre dispositivos). Llená el campo **Quedó pendiente**.
-3. Hacé commit. **Recordale a Max hacer `git push`**, pero no pushees sin que lo pida.
+3. Hacé commit cuando Max lo pida. **Después de cada commit hacé `git push` sin preguntar** (Max lo autorizó el 2026-11-19): sin eso, la sesión siguiente en otro dispositivo no ve nada. Solo push normal a `main`: nunca `--force` ni borrar ramas sin que lo pida.
 
 ## Cómo correr
 

@@ -27,7 +27,7 @@ El proyecto se hace en **muchas sesiones de Claude Code, en varios dispositivos*
 1. **La IA actualiza la documentación** que el cambio dejó desactualizada (ver [README](README.md#cómo-mantener-esta-documentación-al-día)).
 2. **La IA crea el archivo de bitácora** de la sesión.
 3. **Commit** con los cambios de código y de documentación.
-4. **`git push`.** Sin esto, la próxima sesión en otro dispositivo no ve nada. La IA recuerda hacerlo, pero el push lo autoriza Max.
+4. **`git push`.** Sin esto, la próxima sesión en otro dispositivo no ve nada. La IA lo hace sola después de cada commit, sin preguntar: Max lo autorizó el 2026-11-19. Es un push normal a `main`; `--force` o borrar ramas siguen necesitando que Max lo pida.
 
 ### Reglas para evitar conflictos entre dispositivos
 
