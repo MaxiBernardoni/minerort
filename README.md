@@ -57,7 +57,13 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 - Arriba a la izquierda se ve FPS, resolución, llamadas de dibujo y triángulos.
 - Para más FPS: `antialias: false`, bajar `renderDistance` o usar calidad baja. Las sombras son lo más caro.
 
+## Documentación
+
+La carpeta [`docs/`](docs/README.md) explica el proyecto en detalle: [visión](docs/01-vision.md), [estado actual](docs/02-estado-actual.md), [arquitectura](docs/03-arquitectura.md), [roadmap](docs/04-roadmap.md) y [proceso de vibecoding](docs/05-proceso-vibecoding.md).
+
 ## Ideas para seguir
+
+(Versión corta. El plan completo y ordenado está en [docs/04-roadmap.md](docs/04-roadmap.md).)
 
 1. Cuevas con ruido 3D y minerales.
 2. Guardar y cargar el mundo (los bloques que rompiste/pusiste).
