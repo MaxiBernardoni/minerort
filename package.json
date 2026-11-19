@@ -1,0 +1,15 @@
+{
+  "name": "minicraft",
+  "version": "0.1.0",
+  "description": "Mi propia version de Minecraft (Electron + Three.js)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "three": "0.149.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}
