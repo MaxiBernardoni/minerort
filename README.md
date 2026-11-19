@@ -7,6 +7,7 @@ Mi propia versión de Minecraft. Electron + Three.js, mundo generado por código
 ```
 npm install     # solo la primera vez
 npm start
+npm test        # pruebas automáticas (unos 15 segundos, sin mostrar ventana)
 ```
 
 ## Controles

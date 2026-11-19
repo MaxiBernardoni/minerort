@@ -77,6 +77,8 @@ config.js ─▶ (nada)
 | `src/character.js` | 94 | Cuerpo del jugador visible en tercera persona. |
 | `src/inventory.js` | 346 | Datos y UI del inventario, drops en el mundo. |
 | `src/game.js` | 345 | Entrada del juego: física del jugador, raycast, controles, minado/colocación, bucle `frame()`, arranque. |
+| `test/run.js` | 53 | `npm test`: abre el juego en Electron sin ventana, corre las pruebas y devuelve código 0 o 1. No es parte del juego. |
+| `test/pruebas.js` | 295 | Las pruebas, que se ejecutan dentro de la página del juego. |
 
 ## Modelo de datos
 
@@ -191,4 +193,4 @@ Leídos del código; no son bugs confirmados, sino lugares donde un cambio puede
 - **`OPAQUE` en `world.js`** se arma con un bucle fijo de ids 1 a 9. Un bloque nuevo con id distinto necesita ajustarlo.
 - **`NTILES = 11` y el atlas** son números sueltos que deben coincidir con las texturas dibujadas.
 - **Todo corre en un solo hilo.** Cualquier trabajo pesado nuevo (más generación, mobs, guardado) puede notarse en los FPS.
-- **No hay tests**, así que la única forma de verificar es jugar.
+- **Las pruebas (`npm test`) no ven el aspecto ni el mouse real.** Detalle y límites en [06-checklist-pruebas.md](06-checklist-pruebas.md#pruebas-automáticas-npm-test).

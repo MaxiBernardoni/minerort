@@ -93,3 +93,4 @@ Ver la carpeta [`bitacora/`](bitacora/). Sesiones registradas hasta ahora:
 - [2026-11-19 · Pruebas del juego](bitacora/2026-11-19-pruebas-del-juego.md)
 - [2026-11-19 · El mundo conserva los cambios (en memoria)](bitacora/2026-11-19-mundo-persistente-en-memoria.md)
 - [2026-11-19 · Migración a módulos ES](bitacora/2026-11-19-modulos-es.md)
+- [2026-11-19 · Pruebas automáticas (`npm test`)](bitacora/2026-11-19-pruebas-automaticas.md)

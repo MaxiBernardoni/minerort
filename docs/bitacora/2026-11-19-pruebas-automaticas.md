@@ -1,0 +1,22 @@
+# Sesión 2026-11-19 · Pruebas automáticas (`npm test`)
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** convertir la batería de pruebas manuales en un script que se corra solo, último punto de la Fase 0 del roadmap.
+- **Prompt(s) clave:** *"Sí, hacé el script de pruebas"*, respuesta a la propuesta de la IA al cerrar la sesión de módulos ES.
+- **Resultado:** `npm test` abre el juego en Electron sin ventana, corre 20 pruebas en unos 15 segundos y devuelve código 0 o 1 (`test/run.js` y `test/pruebas.js`). Sin dependencias nuevas. Commit: *(pendiente)*.
+- **Decisiones de diseño que tomó la IA:**
+  - Usar el Electron que ya está instalado, en lugar de sumar una librería de pruebas.
+  - Las pruebas corren **dentro de la página del juego**, con el mundo real, y cada una empieza en una plataforma plana y conocida (`arena()`), para no depender de árboles ni del terreno.
+  - Filtro por nombre (`npm test -- hora`) para depurar de a una.
+- **Qué funcionó:**
+  - **Sabotear el código a propósito** para comprobar que las pruebas fallan: sin guardar chunks, con un export faltante y con otro salto. Las tres se detectaron con un mensaje claro. Una batería que nunca se vio fallar no se puede dar por buena.
+  - Mensajes de falla con datos ("T avanzó 2 min, se esperaban ~180") en vez de un simple "falló".
+- **Qué falló o hubo que corregir:**
+  - Una ventana de Electron solo oculta da ~2 cuadros por segundo; con el modo `offscreen` da ~60. Se descubrió midiendo antes de escribir las pruebas.
+  - 3 fallas en la primera corrida, todas **errores de las pruebas, no del juego**: `onGround` quedaba viejo después de teletransportar al jugador, una torre llegaba a y=64 y el mundo termina en 63, y el bloqueo real del puntero se activaba solo en Electron y dejaba el juego "en pausa". La última tardó en aparecer porque solo fallaba combinando varias pruebas; se encontró por bisección con el filtro y mirando el estado de la pantalla cuando fallaba.
+- **Lección:** cuando una prueba falla, **primero hay que decidir si el bug está en el juego o en la prueba**. Acá las tres veces fue la prueba, y se supo porque cada una se aisló y se midió en vez de tocar el código del juego. Además, un fallo que depende del orden casi siempre es estado compartido que una prueba deja sucio.
+- **Quedó pendiente:**
+  - [ ] Jugar a mano con `npm start` lo que `npm test` no ve: mouse real, Esc, aspecto, sensación. Detalle en [06-checklist-pruebas.md](../06-checklist-pruebas.md).
+  - [ ] Medir FPS en una PC modesta (el modo `offscreen` no sirve para eso).
+  - [ ] Actualizar Three.js. Ahora que hay pruebas, es más seguro, pero hay que mirar el aspecto a ojo.
+  - [ ] Elegir la próxima función del roadmap: guardado en disco (Fase 1) es la propuesta.

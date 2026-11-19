@@ -16,7 +16,7 @@ npm install   # solo la primera vez
 npm start
 ```
 
-F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estado del juego (jugador, chunks, inventario, configuración) para experimentar.
+`npm test` corre 20 pruebas automáticas en unos 15 segundos (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)). F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estado del juego (jugador, chunks, inventario, configuración) para experimentar.
 
 ## Qué funciona
 
@@ -73,7 +73,6 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 - Menú principal y menú de opciones (solo hay una pantalla de pausa con la lista de controles).
 - Mods o extensiones.
 - Instalador de Windows.
-- Tests automáticos.
 
 ## Limitaciones conocidas (leídas del código)
 

@@ -31,9 +31,9 @@ Preparar el terreno para que el resto no se rompa. No agrega nada visible.
 |---|---|
 | ✅ **Hecho (2026-11-19).** Los cambios al mundo ya no se pierden al alejarte: los chunks modificados se guardan en memoria (`savedChunks`). | Era la base del guardado y del multijugador. Queda pendiente el guardado en disco (Fase 1) y limitar el uso de memoria. |
 | ✅ **Hecho (2026-11-19): migración a módulos ES.** Ver [arquitectura](03-arquitectura.md#decisión-clave-módulos-es-sin-bundler). | Los mods, el multijugador y mantener el código grande lo piden. **Queda pendiente actualizar Three.js** (hoy 0.149): cambia la iluminación desde r155 y hay que revisar el aspecto del juego; mejor como tarea aparte. |
-| **Agregar una forma mínima de probar** (por ejemplo un script que genere chunks y verifique datos). | Hoy la única verificación es jugar. |
+| ✅ **Hecho (2026-11-19): pruebas automáticas** con `npm test`. | Detalle en [06-checklist-pruebas.md](06-checklist-pruebas.md#pruebas-automáticas-npm-test). No ven el aspecto ni el mouse real. |
 
-> Siguiente de la Fase 0: una forma mínima de probar sin jugar a mano. La migración a módulos se hizo temprano, con el código chico (~1.950 líneas), que es cuando sale más barata.
+> La Fase 0 está completa salvo actualizar Three.js. La migración a módulos y las pruebas se hicieron temprano, con el código chico (~1.950 líneas), que es cuando salen más baratas.
 
 ### Fase 1 · Persistencia y base de supervivencia
 

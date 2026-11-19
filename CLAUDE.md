@@ -28,10 +28,13 @@ Clon de Minecraft en Electron + Three.js, hecho como experimento de aprendizaje 
 
 ```
 npm install    # solo la primera vez
-npm start
+npm start      # jugar
+npm test       # las pruebas automáticas (≈15 s, sin mostrar ventana); `npm test -- hora` corre solo algunas
 ```
 
 F12 abre la consola. `window.mc` expone el estado del juego.
+
+**Corré `npm test` antes de cada commit de código.** Si agregás o cambiás una función, sumá su prueba en `test/pruebas.js` (guía en [docs/06-checklist-pruebas.md](docs/06-checklist-pruebas.md#pruebas-automáticas-npm-test)). Si una prueba falla, no commitees hasta entender por qué: puede ser un bug del juego o un error de la prueba, y hay que decir cuál.
 
 ## Convenciones del código
 
@@ -48,4 +51,4 @@ F12 abre la consola. `window.mc` expone el estado del juego.
 - Los cambios al mundo se conservan en memoria (`savedChunks` en `world.js`) pero **se pierden al cerrar el juego**: no hay guardado en disco.
 - Para probar en el navegador integrado, el panel tiene que estar visible; si está oculto no corren los cuadros.
 - La generación de chunks corre en el hilo principal.
-- No hay tests: la verificación es jugar. Si no podés probarlo en el juego, decilo en vez de afirmar que anda.
+- `npm test` cubre la lógica pero **no ve el aspecto** (colores, texturas, sombras), ni el mouse real, ni el rendimiento en una PC modesta. Si tu cambio toca eso, decí que no lo pudiste verificar en vez de afirmar que anda.

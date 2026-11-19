@@ -4,7 +4,8 @@
   "description": "Mi propia version de Minecraft (Electron + Three.js)",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "electron test/run.js"
   },
   "dependencies": {
     "three": "0.149.0"

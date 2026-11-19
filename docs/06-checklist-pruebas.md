@@ -1,9 +1,33 @@
 # 06 · Checklist de pruebas
 
-> Última ejecución: 2026-11-19 · commit `398be37`.
+> Última revisión: 2026-11-19.
 > Leyenda: ✅ anduvo · ⚠️ anduvo con una observación · ⬜ no probado.
 
-## Cómo se probó
+## Pruebas automáticas: `npm test`
+
+Desde el 2026-11-19 la mayor parte de este checklist se verifica sola con un comando:
+
+```powershell
+npm test                  # corre las 20 pruebas (≈15 segundos)
+npm test -- hora          # solo las pruebas cuyo nombre contiene "hora" (admite expresiones regulares)
+```
+
+- **Cómo funciona:** `test/run.js` abre el juego real en Electron **sin mostrar ventana** (modo `offscreen`), ejecuta `test/pruebas.js` adentro de la página y sale con código 0 si todo pasó o 1 si algo falló. No instala nada: usa el Electron del proyecto.
+- **Qué cubre:** arranque como módulos, cuadros, terreno estable (misma semilla = mismas alturas), caer, saltar, paredes, volar, tercera persona, sombras, romper/poner/recoger bloques, modo creativo, bordes de chunk, todo el inventario, tirar objetos, rueda del mouse, hora y noche, cambio de calidad, nadar bajo el agua, persistencia en memoria al alejarse y que no haya errores en la consola.
+- **Se comprobó que detecta roturas** sabotando el código a propósito: sin guardar chunks, con un export faltante y con otra velocidad de salto. Las tres veces falló con un mensaje claro y código 1.
+- **Cómo agregar una prueba:** en `test/pruebas.js`, sumar `await prueba('nombre', async () => { … })` y usar `afirmar(condición, 'mensaje')`. Casi todas empiezan con `await arena()`, que arma una plataforma de piedra a y=60 y deja inventario, hora y calidad en un estado conocido.
+- **Si cambiás la generación del terreno a propósito:** la prueba "el terreno es estable" va a fallar; actualizá la lista de alturas de referencia.
+
+**Lo que `npm test` no puede ver:**
+
+- El aspecto: no compara imágenes, así que un cambio de colores, texturas o sombras pasa sin que nadie se entere.
+- Mirar con el mouse real, la pausa con Esc y el bloqueo de puntero. Las pruebas ignoran los eventos `pointerlockchange` y manejan ese estado a mano.
+- La sensación de juego y el rendimiento en una PC modesta (el modo `offscreen` no sirve para medir FPS).
+- Las animaciones (golpe al aterrizar, balanceo, grietas, partículas) solo se ejecutan, no se evalúan.
+
+Antes de commitear código conviene correr `npm test`. Las tablas de abajo siguen siendo el detalle de lo que se probó la primera vez, y las filas ⬜ son las que necesitan a una persona.
+
+## Cómo se probó la primera vez (a mano, antes de `npm test`)
 
 - El juego se sirvió con un servidor estático local y se abrió en el **navegador integrado** de la app (no en la ventana de Electron).
 - Las pruebas se hicieron desde la consola con `window.mc` y con eventos de teclado y mouse simulados. Se saltó el bloqueo de puntero con `mc.setLocked(true)`.
