@@ -12,7 +12,7 @@ Clon de Minecraft en Electron + Three.js, hecho como experimento de aprendizaje 
 ## Al empezar la sesión
 
 1. Corré `git pull` (preguntale a Max si hay dudas sobre ramas). Sin esto se trabaja sobre una versión vieja.
-2. Leé [docs/README.md](docs/README.md), [docs/02-estado-actual.md](docs/02-estado-actual.md) y [docs/03-arquitectura.md](docs/03-arquitectura.md).
+2. Leé [docs/08-guia-para-sesiones.md](docs/08-guia-para-sesiones.md) (cómo leer, escribir docs y pensar etapas; es corta) y después [docs/README.md](docs/README.md), [docs/02-estado-actual.md](docs/02-estado-actual.md) y [docs/03-arquitectura.md](docs/03-arquitectura.md).
 3. Leé las últimas 2 o 3 entradas de [docs/bitacora/](docs/bitacora/), en especial el campo **Quedó pendiente**.
 4. Preguntale a Max qué quiere hacer. Si es una función grande, hacé preguntas antes de escribir código.
 

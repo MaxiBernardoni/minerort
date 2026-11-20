@@ -11,6 +11,7 @@
 | [05-proceso-vibecoding.md](05-proceso-vibecoding.md) | ¿Cómo se trabaja con la IA y entre dispositivos? Reglas y plantillas. |
 | [06-checklist-pruebas.md](06-checklist-pruebas.md) | ¿Qué se probó, qué anda y qué falta probar? |
 | [07-mods.md](07-mods.md) | ¿Cómo se escribe un mod? La API, con un ejemplo. |
+| [08-guia-para-sesiones.md](08-guia-para-sesiones.md) | ¿Cómo leer y escribir la documentación y cómo pensar las etapas? **Leelo al empezar una sesión.** |
 | [bitacora/](bitacora/) | ¿Qué se hizo en cada sesión? Un archivo por sesión, con prompts y lecciones. |
 
 Además, [`CLAUDE.md`](../CLAUDE.md) en la raíz es lo que Claude Code lee solo al empezar cada sesión.
