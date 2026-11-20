@@ -30,6 +30,7 @@ Clon de Minecraft en Electron + Three.js, hecho como experimento de aprendizaje 
 npm install    # solo la primera vez
 npm start      # jugar
 npm test       # las pruebas automáticas (≈30 s, sin mostrar ventana); `npm test -- hora` corre solo algunas
+npm run captura   # saca PNG del juego en capturas/ (mano, suelo, inventario, crafteo, mesa, barra, sprites) para MIRARLOS
 ```
 
 F12 abre la consola. `window.mc` expone el estado del juego.
@@ -57,4 +58,6 @@ F12 abre la consola. `window.mc` expone el estado del juego.
 - Los chunks modificados se mantienen en memoria en `savedChunks` (`world.js`).
 - Para probar en el navegador integrado, el panel tiene que estar visible; si está oculto no corren los cuadros.
 - La generación de chunks corre en el hilo principal.
-- `npm test` cubre la lógica pero **no ve el aspecto** (colores, texturas, sombras), ni el mouse real, ni el rendimiento en una PC modesta. Si tu cambio toca eso, decí que no lo pudiste verificar en vez de afirmar que anda.
+- `npm test` cubre la lógica pero **no ve el aspecto** (colores, texturas, sombras), ni el mouse real, ni el rendimiento en una PC modesta.
+- **Si cambiás algo visual** (modelos, texturas, la mano, la interfaz), corré `npm run captura` y **mirá los PNG de `capturas/`** (con la herramienta de leer archivos, que muestra imágenes) antes de decir que quedó bien. Un bloque a mitad del brazo y una manzana cúbica pasaron inadvertidos porque nadie miró. Si no pudiste mirarlo, decilo en vez de afirmar que se ve bien.
+- **Bloques y objetos son dos registros:** `BLOCKS` (ids 1–99, lo que existe en el mundo) e `ITEMS` (ids desde 100, lo que NO es un bloque: manzana, palo, herramientas). Para un objeto nuevo: entrada en `ITEMS` + nombre en `ID` (`config.js`) + sprite en `itemSprites` (`textures.js`) + receta en `objetos.js` si se fabrica. Se dibujan con `makeItemGeometry`/`itemMaterial` (`effects.js`), nunca con `makeBlockGeometry`. **Usá `ID.MESA`, `ID.PALO`… en vez de números sueltos.** Un id de objeto nunca debe terminar en `chunks`. Detalle en [docs/03-arquitectura.md](docs/03-arquitectura.md#objetos-planos-y-la-mano-effectsjs).

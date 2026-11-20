@@ -1,0 +1,30 @@
+# Sesión 2026-11-20 · Fase 2 completa: objetos, crafteo y herramientas
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** hacer la Fase 2 del roadmap. Max confirmó con *"Sí, Fase 2"* y antes pidió dos arreglos que se hicieron primero (la manzana como objeto plano y la posición de lo que se sostiene en la mano; ver [la bitácora de esas correcciones](2026-11-20-item-plano-y-mano.md)).
+- **Resultado:** un registro de **objetos** separado del de bloques, un bloque nuevo (**mesa de crafteo**), **recetas** de forma (en el inventario 2×2 y en la mesa 3×3), **herramientas** con velocidad y desgaste, y un inventario con crafteo integrado y un catálogo creativo con pestañas y buscador. `npm test` pasó de 53 a **62 pruebas**. Commit: *(pendiente: también falta commitear las correcciones previas de la mano)*.
+- **Decisiones que tomó la IA** (el roadmap no decía; todas fáciles de cambiar y anotadas en [04-roadmap.md](../04-roadmap.md)):
+  - **Dos registros:** bloques en `BLOCKS` (1–99) y objetos en `ITEMS` (desde 100), con `ID` para los nombres. La manzana pasó del 11 al 100 porque el 11 se volvió la mesa. **Se migran las partidas viejas** con una marca `itemsV` en el guardado.
+  - **Objetos y recetas:** palo; pico, hacha y pala de madera y de piedra; recetas con forma que valen en cualquier posición y espejadas.
+  - **La piedra, el adoquín y el ladrillo solo sueltan algo con pico** (como en Minecraft). Es lo que más cambia el comienzo del juego; con el kit inicial se puede fabricar todo.
+  - **Números de Minecraft:** ×2 y ×4, 59 y 131 usos. Cada bloque roto gasta un uso, sea o no del tipo de la herramienta. Sin "niveles" de herramienta.
+  - **Armaduras, mano secundaria y muñeco del jugador: afuera a propósito.** Sin armaduras ni segunda mano serían ranuras que no hacen nada. Conviene sumarlos junto con esas funciones.
+  - **Click derecho sobre una mesa siempre la abre**, así que no se puede poner un bloque apuntando a una mesa.
+- **Qué funcionó:**
+  - **Las recetas y las reglas de herramientas son funciones puras** (`objetos.js`): se pueden probar con tablas de casos sin abrir nada.
+  - **Aplicar la lección de la sesión anterior:** sacar capturas y mirarlas. Eso encontró dos problemas que ninguna prueba habría visto: **el hacha y la pala parecían cucharas** (se rediseñaron mirando los sprites ampliados, nueva escena `sprites` de `npm run captura`) y **las herramientas se sostenían por la mitad del mango** (se agregó un punto de agarre por herramienta).
+  - **Sabotear antes de creer.** Las 61 pruebas pasaron a la primera, así que se rompió el código a propósito en 13 lugares nuevos (recetas sin espejo o dependientes de la posición, herramientas que aceleran todo, que no se desgastan, que se apilan, que pierden el desgaste, crafteo que no consume, grilla que no se vacía al cerrar, mesa que no abre, pestañas que no filtran, manzana vieja sin migrar, desgaste sin guardar). **Las 13 se detectaron** y todos los archivos se restauraron y verificaron con `cmp`.
+- **Qué falló o hubo que corregir:**
+  - **Un script mío falló a la mitad** (un `node -e` con una expresión regular mal armada) y no tocó nada; se rehizo con ediciones directas. Otra vez hubo una diferencia entre la ruta `/tmp` del shell y la de node: el archivo temporal no estaba donde node lo buscaba. Se resolvió usando la carpeta temporal de la sesión.
+  - La prueba de "rompe piedra con la mano" que ya existía **tuvo que reescribirse** porque el diseño nuevo la invalida a propósito (sin pico no suelta nada).
+  - Una documentación de la arquitectura quedó con una sección vieja duplicada ("Inventario") junto a la nueva; se encontró al revisar los títulos y se quitó.
+- **Lección:** **cuando el trabajo es visual, hay que mirar, y hay que mirar más de una vez.** Cada captura mostró algo que la anterior no: primero los sprites mal dibujados, después cómo se sostenían. Y para código con muchas reglas, probar con una tabla de casos (recetas) dio más cobertura que escribir una prueba por receta.
+- **Quedó pendiente:**
+  - [ ] **Commitear** (las correcciones de la mano y la Fase 2 están juntas sin commit).
+  - [ ] **Que Max juegue y vea:** cómo se sienten las herramientas, que la piedra necesite pico, la mesa y las pantallas de crafteo. Las capturas salen de una ventana sin pantalla.
+  - [ ] **Ajustar los números** (velocidades, duraciones, recetas) según cómo se sienta.
+  - [ ] Armaduras, mano secundaria y muñeco del jugador (junto con las armaduras).
+  - [ ] Repartir una pila arrastrando y juntar con doble click, para parecerse más al inventario original.
+  - [ ] Un libro de recetas dentro del juego (hoy las recetas solo están en la documentación).
+  - [ ] El personaje en tercera persona no sostiene nada.
+  - [ ] **Fase 3** (mundo más rico: cuevas, minerales, biomas, agua que fluye). Los minerales darían sentido a un "nivel" de herramienta.

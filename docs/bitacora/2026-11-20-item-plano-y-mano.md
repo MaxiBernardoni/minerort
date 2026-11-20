@@ -1,0 +1,23 @@
+# Sesión 2026-11-20 · La manzana como objeto plano y la mano
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** antes de empezar la Fase 2, arreglar dos cosas que Max vio en las capturas: **(1)** la manzana se dibujaba como un bloque y tiene que ser un ítem plano, **(2)** los bloques e ítems en la mano aparecían a la mitad del brazo y no en la mano.
+- **Prompt(s) clave:** *"Antes de empezar con la fase 2 quiero que arregles dos cosas: la textura de la manzana es un bloque, tiene que ser un item; y quiero que veas en las capturas cómo se ven los bloques e items en la mano, si te fijas están a la mitad del brazo, no en la mano, soluciona eso"*.
+- **Resultado:** la manzana es un **sprite de 16×16 con espesor** (como en Minecraft), plano en la mano, en el suelo y en el inventario. Los bloques y objetos se sostienen **en la punta del brazo**. Hay una herramienta nueva, `npm run captura`, que saca PNG del juego para mirarlos. `npm test` pasa de 51 a 53 pruebas. Commit: *(pendiente)*.
+- **Qué pasó con "las capturas":** el mensaje de Max hablaba de capturas pero no llegó ninguna imagen a la IA. En lugar de pedirlas, la IA **sacó las suyas**: abrió el juego en Electron, armó la escena y guardó PNG. Al mirarlas vio exactamente lo que Max describía: el cubo quedaba sobre la unión entre la piel y la manga del brazo, y la manzana era un cubo rojo con la textura en las seis caras.
+- **Qué funcionó:**
+  - **Mirar antes de arreglar.** Con la captura "antes" se entendió el problema real: no era un número mal puesto sino que el objeto estaba en z = −0.05 cuando la punta del brazo está en z = −0.15.
+  - **Mirar después de arreglar, y repetir.** La manzana quedó primero **de canto** (el brazo está girado, así que el sprite quedaba casi perpendicular a la cámara). Solo se vio mirando. Se resolvió deshaciendo el giro del grupo con la rotación inversa (`order = 'ZYX'`).
+  - **Otra captura mostró que los objetos del suelo no se veían**: el imán del juego los recogía antes de la foto. Se sacó en modo creativo, donde no se recogen.
+  - **Convertir el script temporal en herramienta del proyecto** (`npm run captura`, carpeta `capturas/` ignorada por git), para que cualquier sesión futura pueda *ver* el juego.
+  - **Pruebas de geometría** para fijar las dos correcciones, y se comprobó que fallan si se vuelve atrás (bloque en z = −0.05 y manzana con espesor de cubo).
+- **Qué falló o hubo que corregir:**
+  - **La IA no había visto el juego jamás en las sesiones anteriores**, solo lo probaba con código. Por eso dio por buenos corazones, menú y manzana sin mirarlos. Esta vez se miraron también la barra de salud y el inventario, y estaban bien.
+  - La primera captura del suelo salió vacía (hojas delante, y después el imán). Hicieron falta tres intentos.
+  - La rotación del sprite no salió a la primera: el primer valor lo dejó de canto.
+- **Lección:** **si no podés ver el resultado, no podés decir que está bien.** Para lo visual, las pruebas automáticas no alcanzan: hay que sacar una captura y mirarla, antes y después de cambiar. Quedó escrito en `CLAUDE.md`. Y cuando el usuario menciona capturas que no llegaron, conviene sacar las propias en vez de pedírselas.
+- **Quedó pendiente:**
+  - [ ] **Commitear.**
+  - [ ] **Que Max mire cómo quedó en el juego real.** Las capturas salen de una ventana sin pantalla; la perspectiva puede variar un poco con el tamaño real de la ventana.
+  - [ ] **Fase 2:** separar el registro de ítems del de bloques, más sprites (palos, herramientas), mesa de crafteo y recetas, herramientas con durabilidad, inventario más parecido al de Minecraft.
+  - [ ] El personaje en tercera persona no sostiene el objeto en la mano (solo se ve en primera persona).

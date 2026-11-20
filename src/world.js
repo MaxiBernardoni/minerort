@@ -182,7 +182,7 @@ function disposeChunkMeshes(ch) {
 const PW = CS + 2, PL = PW * PW;
 const pad = new Uint8Array(PL * (H + 2));
 const OPAQUE = new Uint8Array(256);                    // 1 = tapa las caras vecinas
-for (let b = 1; b <= 9; b++) OPAQUE[b] = b === LEAVES ? 0 : 1;
+for (const k of Object.keys(BLOCKS)) { const b = +k; OPAQUE[b] = (b === LEAVES || b === WATER) ? 0 : 1; }   // todos los bloques tapan, menos hojas y agua
 const FACE_OFF = FACES.map(F => F.n[0] + F.n[2] * PW + F.n[1] * PL);
 const FACE_AO = FACES.map(F => F.ao.map(({ s1, s2 }) => {
   const a = s1[0] + s1[2] * PW + s1[1] * PL, b = s2[0] + s2[2] * PW + s2[1] * PL;

@@ -24,6 +24,16 @@
   .invLabel { font-size: 12px; margin: 10px 0 4px; color: #333; }
   .invHint { font-size: 11px; color: #444; margin-top: 12px; line-height: 1.4; }
   .grid { display: grid; grid-template-columns: repeat(9, 48px); gap: 3px; }
+  .craftFila { display: flex; align-items: center; gap: 16px; padding: 2px 0 6px; }
+  .craftGrid { display: grid; gap: 3px; }
+  .craftGrid.g2 { grid-template-columns: repeat(2, 48px); }
+  .craftGrid.g3 { grid-template-columns: repeat(3, 48px); }
+  .flecha { font-size: 30px; color: #555; line-height: 1; }
+  .islot.resultado { width: 56px; height: 56px; }
+  .catalogBar { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+  .catalogBar .pestana { font: 600 12px system-ui; padding: 4px 10px; background: #a3a3a3; color: #222; border: 2px solid; border-color: #fff #373737 #373737 #fff; cursor: pointer; }
+  .catalogBar .pestana.activa { background: #7c9c6a; color: #fff; border-color: #373737 #fff #fff #373737; }
+  #catalogBuscar { margin-left: auto; width: 140px; padding: 3px 6px; font-size: 12px; }
   .islot { position: relative; width: 48px; height: 48px; box-sizing: border-box; background: #8b8b8b; border: 2px solid; border-color: #373737 #fff #fff #373737; }
   .islot:hover { background: #a9a9a9; }
   .islot canvas, .cursorItem canvas { width: 100%; height: 100%; display: block; pointer-events: none; }

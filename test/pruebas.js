@@ -146,18 +146,25 @@ async (filtro = '') => {
   });
 
   // ---------------- bloques ----------------
-  await prueba('rompe piedra (~1 s), suelta adoquin y lo recoge', async () => {
-    await arena();
-    mc.setBlock(CX, PY + 2, CZ - 1, 3);                                       // a la altura de los ojos, 1 bloque adelante
-    const antes = cuenta(9);
+  // Rompe el bloque de enfrente (a la altura de los ojos, 1 bloque adelante) y devuelve cuantos segundos tardo
+  async function romperDeEnfrente(id) {
+    mc.setBlock(CX, PY + 2, CZ - 1, id);
     mc.mouse.left = true; const t0 = performance.now();
-    const rompio = await esperar(() => mc.getBlock(CX, PY + 2, CZ - 1) === 0, 5000);
+    const rompio = await esperar(() => mc.getBlock(CX, PY + 2, CZ - 1) === 0, 6000);
     const seg = (performance.now() - t0) / 1000;
     mc.mouse.left = false;
-    afirmar(rompio, 'no se rompio en 5 s');
-    afirmar(seg > 0.7 && seg < 2, `tardo ${seg.toFixed(2)} s (esperado ~1.1)`);
-    afirmar(await esperar(() => cuenta(9) === antes + 1, 4000), 'el adoquin no llego al inventario');
-    return `${seg.toFixed(2)} s, +1 adoquin`;
+    afirmar(rompio, 'no se rompio en 6 s');
+    return seg;
+  }
+
+  await prueba('rompe tierra con la mano (~0.5 s), suelta tierra y la recoge', async () => {
+    await arena();
+    mc.selectSlot(8);                                                         // mano vacia
+    const antes = cuenta(2);
+    const seg = await romperDeEnfrente(2);
+    afirmar(seg > 0.3 && seg < 1.2, `tardo ${seg.toFixed(2)} s (esperado ~0.5)`);
+    afirmar(await esperar(() => cuenta(2) === antes + 1, 4000), 'la tierra no llego al inventario');
+    return `${seg.toFixed(2)} s, +1 tierra`;
   });
 
   await prueba('pone un bloque (gasta 1) y no lo pone dentro del jugador', async () => {
@@ -195,6 +202,182 @@ async (filtro = '') => {
       mc.setBlock(x, PY + 3, z, 3); mc.setBlock(x, PY + 3, z, 0);
     }
     afirmar(arenaLista(), 'el chunk quedo sin malla');
+  });
+
+  // ---------------- objetos planos y la mano ----------------
+  await prueba('objetos: la manzana es plana (mano y suelo) y un bloque es un cubo', async () => {
+    await arena();
+    // proporcion espesor/ancho de una malla: ~1 para un cubo, ~0.1 para un objeto plano
+    const espesor = geo => { geo.computeBoundingBox(); const b = geo.boundingBox; return (b.max.z - b.min.z) / (b.max.x - b.min.x); };
+    mc.inventory[2] = { id: 100, count: 1 }; mc.selectSlot(2);
+    afirmar(mc.hand.mesh, 'no hay nada en la mano');
+    let e = espesor(mc.hand.mesh.geometry);
+    afirmar(e < 0.3, `la manzana en la mano tiene espesor/ancho ${e.toFixed(2)}: es un cubo, tiene que ser plana`);
+    mc.selectSlot(0);                                                                      // tablones
+    e = espesor(mc.hand.mesh.geometry);
+    afirmar(e > 0.95, `el bloque en la mano tiene espesor/ancho ${e.toFixed(2)}: tiene que ser un cubo`);
+    mc.spawnDrop(100, 1, CX + 0.5, PY + 1.5, CZ - 1.5, 0, 0, 0);
+    mc.spawnDrop(7, 1, CX + 1.5, PY + 1.5, CZ - 1.5, 0, 0, 0);
+    const [manzana, bloque] = mc.drops.slice(-2);
+    afirmar(espesor(manzana.mesh.geometry) < 0.3, 'la manzana en el suelo es un cubo');
+    afirmar(espesor(bloque.mesh.geometry) > 0.95, 'el bloque en el suelo no es un cubo');
+  });
+
+  await prueba('mano: el objeto va en la punta del brazo (la mano), no a la mitad', async () => {
+    await arena();
+    // El brazo termina en z = -0.15 (hand.mesh queda en el mismo espacio que el brazo). A la mitad del brazo seria z ~ -0.05 o mas.
+    for (const [ranura, id] of [[0, 7], [1, 8], [2, 100], [3, mc.ID.PICO_PIEDRA], [4, mc.ID.HACHA_MADERA]]) {
+      mc.inventory[ranura] = { id, count: 1 }; mc.selectSlot(ranura);
+      const z = mc.hand.mesh.position.z;
+      afirmar(z <= -0.15 && z >= -0.35, `el objeto ${id} esta en z=${z.toFixed(2)}, se esperaba en la punta del brazo (entre -0.35 y -0.15)`);
+    }
+  });
+
+  // ---------------- herramientas ----------------
+  await prueba('herramientas: la piedra con la mano no suelta nada; con pico es ~4x mas rapida, suelta adoquin y gasta un uso', async () => {
+    await arena();
+    mc.selectSlot(8);                                                         // mano vacia
+    const antesMano = cuenta(9);
+    const segMano = await romperDeEnfrente(3);
+    await dormir(1500);                                                       // si fuera a soltar algo, ya lo habria recogido
+    afirmar(mc.drops.length === 0 && cuenta(9) === antesMano, `con la mano la piedra solto algo (${mc.drops.length} objetos en el suelo)`);
+    mc.inventory[4] = { id: mc.ID.PICO_PIEDRA, count: 1 }; mc.selectSlot(4);
+    const segPico = await romperDeEnfrente(3);
+    afirmar(segPico < segMano / 2, `con el pico tardo ${segPico.toFixed(2)} s y con la mano ${segMano.toFixed(2)} s: no es mucho mas rapido`);
+    afirmar(await esperar(() => cuenta(9) === antesMano + 1, 4000), 'con el pico el adoquin no llego al inventario');
+    afirmar(mc.inventory[4] && mc.inventory[4].dano === 1, `el pico tiene desgaste ${mc.inventory[4] && mc.inventory[4].dano}, se esperaba 1`);
+    return `mano ${segMano.toFixed(2)} s, pico ${segPico.toFixed(2)} s`;
+  });
+
+  await prueba('herramientas: cada una acelera solo su tipo de bloque', async () => {
+    await arena();
+    mc.inventory[4] = { id: mc.ID.HACHA_PIEDRA, count: 1 }; mc.selectSlot(4);
+    const conHacha = await romperDeEnfrente(4);                               // madera: el hacha si
+    const conHachaEnPiedra = await romperDeEnfrente(2);                       // tierra: el hacha no
+    afirmar(conHacha < 0.5, `el hacha rompio madera en ${conHacha.toFixed(2)} s (esperado ~0.23)`);
+    afirmar(conHachaEnPiedra > 0.3, `el hacha rompio tierra en ${conHachaEnPiedra.toFixed(2)} s: no deberia acelerarla (a mano ~0.45)`);
+    return `madera ${conHacha.toFixed(2)} s, tierra ${conHachaEnPiedra.toFixed(2)} s`;
+  });
+
+  await prueba('herramientas: al agotarse se rompe y desaparece', async () => {
+    await arena();
+    mc.inventory[4] = { id: mc.ID.PALA_MADERA, count: 1, dano: 58 };         // dura 59: le queda un uso
+    mc.selectSlot(4);
+    await romperDeEnfrente(2);
+    afirmar(mc.inventory[4] === null, 'la pala agotada sigue en el inventario');
+    afirmar(/rompi/i.test(el('toast').textContent), `el aviso dice "${el('toast').textContent}"`);
+  });
+
+  await prueba('herramientas: no se apilan, no se ponen como bloque y conservan el desgaste al moverlas', async () => {
+    await arena();
+    mc.inventory.fill(null);
+    afirmar(mc.invAdd(mc.ID.PICO_MADERA, 2) === 0, 'no entraron dos picos');
+    afirmar(mc.inventory[0].count === 1 && mc.inventory[1] && mc.inventory[1].count === 1, 'dos picos se apilaron en una casilla');
+    mc.inventory[0].dano = 5;
+    mc.selectSlot(0); P.pitch = -1;
+    mc.mouse.right = true; await dormir(500); mc.mouse.right = false;
+    afirmar(mc.getBlock(CX, PY + 1, CZ - 1) === 0, 'puso el pico como si fuera un bloque');
+    // moverlo con el mouse no le borra el desgaste
+    tecla('KeyE');
+    const grillas = document.querySelectorAll('#invPanel .grid'), barra = grillas[2].children, mochila = grillas[1].children;
+    clic(barra[0]); clic(mochila[3]);                                         // de la barra a la mochila (casilla 12)
+    afirmar(mc.inventory[0] === null && mc.inventory[12] && mc.inventory[12].dano === 5, 'el desgaste se perdio al moverlo');
+    clic(mochila[3]); tecla('KeyE');                                          // lo agarra y cierra con el en la mano: vuelve a la mochila
+    const vuelta = mc.inventory.find(s => s && s.id === mc.ID.PICO_MADERA && s.dano === 5);
+    afirmar(vuelta, 'al cerrar con el pico en la mano se perdio su desgaste');
+  });
+
+  await prueba('recetas: forma, posicion y espejo', async () => {
+    const r = (grilla, ancho) => { const x = mc.buscarReceta(grilla, ancho); return x ? `${x.id}x${x.count}` : null; };
+    const { MADERA: M, TABLONES: T, ADOQUIN: A, PALO: S, MESA, PICO_MADERA, PICO_PIEDRA, HACHA_MADERA, PALA_MADERA, PALA_PIEDRA } = mc.ID;
+    const esperar_ = (obtenido, esperado, que) => afirmar(obtenido === esperado, `${que}: dio ${obtenido}, se esperaba ${esperado}`);
+    esperar_(r([M, 0, 0, 0], 2), `${T}x4`, '1 madera en la esquina de 2x2');
+    esperar_(r([0, 0, 0, M], 2), `${T}x4`, '1 madera en otra esquina');
+    esperar_(r([0, 0, 0, 0, 0, 0, 0, M, 0], 3), `${T}x4`, '1 madera en el medio de 3x3');
+    esperar_(r([T, 0, T, 0], 2), `${S}x4`, '2 tablones vertical a la izquierda');
+    esperar_(r([0, T, 0, T], 2), `${S}x4`, '2 tablones vertical a la derecha');
+    esperar_(r([T, T, 0, 0], 2), null, '2 tablones en horizontal no es un palo');
+    esperar_(r([T, T, T, T], 2), `${MESA}x1`, 'mesa de crafteo');
+    esperar_(r([T, T, T, 0, S, 0, 0, S, 0], 3), `${PICO_MADERA}x1`, 'pico de madera');
+    esperar_(r([A, A, A, 0, S, 0, 0, S, 0], 3), `${PICO_PIEDRA}x1`, 'pico de piedra');
+    esperar_(r([T, T, 0, T, S, 0, 0, S, 0], 3), `${HACHA_MADERA}x1`, 'hacha');
+    esperar_(r([0, T, T, 0, S, T, 0, S, 0], 3), `${HACHA_MADERA}x1`, 'hacha espejada');
+    esperar_(r([0, T, 0, 0, S, 0, 0, S, 0], 3), `${PALA_MADERA}x1`, 'pala');
+    esperar_(r([0, A, 0, 0, S, 0, 0, S, 0], 3), `${PALA_PIEDRA}x1`, 'pala de piedra en el medio');
+    esperar_(r([T, 0, 0, S, 0, 0, S, 0, 0], 3), `${PALA_MADERA}x1`, 'pala pegada a la izquierda');
+    esperar_(r([T, A, T, 0, S, 0, 0, S, 0], 3), null, 'materiales mezclados');
+    esperar_(r([T, T, T, 0, S, 0, 0, 0, 0], 3), null, 'pico incompleto');
+    esperar_(r([0, 0, 0, 0], 2), null, 'grilla vacia');
+    esperar_(r([T, T, S, S], 2), null, 'una pala no entra en 2x2');
+  });
+
+  await prueba('crafteo: en el inventario (2x2) se fabrica, se consume y los ingredientes sobrantes vuelven al cerrar', async () => {
+    await arena();
+    mc.inventory.fill(null); mc.inventory[3] = { id: mc.ID.MADERA, count: 3 };
+    tecla('KeyE');
+    afirmar(el('craftGrid2').style.display !== 'none' && el('craftGrid3').style.display === 'none', 'no se ve la grilla de 2x2');
+    afirmar(/Inventario/.test(document.querySelector('.invTitle h2').textContent), 'el titulo no es "Inventario"');
+    const grillas = document.querySelectorAll('#invPanel .grid'), barra = grillas[2].children;
+    const celdas = document.querySelectorAll('#craftGrid2 .islot');
+    clic(barra[3]); clic(celdas[1]);                                          // las 3 maderas, a la casilla de arriba a la derecha
+    afirmar(mc.resultadoCraft() && mc.resultadoCraft().id === mc.ID.TABLONES && mc.resultadoCraft().count === 4, 'no aparecio el resultado (4 tablones)');
+    clic(el('craftResultado'));                                               // saca 4 tablones
+    afirmar(mc.craft[1] && mc.craft[1].count === 2, `quedaron ${mc.craft[1] && mc.craft[1].count} maderas, se esperaban 2`);
+    clic(barra[0]);                                                           // los suelta en la casilla 0 de la barra
+    afirmar(mc.inventory[0] && mc.inventory[0].id === mc.ID.TABLONES && mc.inventory[0].count === 4, 'los tablones no quedaron en la barra');
+    clic(el('craftResultado'), 0, true);                                      // Shift+click: fabrica todo lo que se pueda (2 maderas -> 8 tablones)
+    afirmar(mc.craft[1] === null, 'la madera no se consumio por completo');
+    afirmar(mc.inventory.reduce((n, s) => n + (s && s.id === mc.ID.TABLONES ? s.count : 0), 0) === 12, 'no hay 12 tablones en total');
+    // lo que queda en la grilla vuelve al inventario al cerrar
+    mc.inventory.fill(null); mc.inventory[3] = { id: mc.ID.ADOQUIN, count: 5 };
+    clic(document.querySelectorAll('#invPanel .grid')[2].children[3]); clic(celdas[0]);
+    tecla('KeyE');
+    afirmar(mc.craft.every(c => c === null), 'quedo algo en la grilla al cerrar');
+    afirmar(mc.inventory.reduce((n, s) => n + (s && s.id === mc.ID.ADOQUIN ? s.count : 0), 0) === 5, 'se perdieron adoquines al cerrar con la grilla ocupada');
+  });
+
+  await prueba('mesa de crafteo: click derecho la abre (3x3), se fabrica un pico y no se pone un bloque al lado', async () => {
+    await arena();
+    mc.inventory.fill(null);
+    mc.inventory[0] = { id: mc.ID.TABLONES, count: 10 }; mc.inventory[1] = { id: mc.ID.PALO, count: 10 }; mc.selectSlot(0);
+    mc.setBlock(CX, PY + 2, CZ - 1, mc.ID.MESA);                              // enfrente, a la altura de los ojos
+    mc.mouse.right = true;
+    afirmar(await esperar(() => el('inventory').style.display === 'flex', 2000), 'el click derecho sobre la mesa no abrio nada');
+    mc.mouse.right = false;
+    afirmar(/Mesa/.test(document.querySelector('.invTitle h2').textContent), `el titulo es "${document.querySelector('.invTitle h2').textContent}"`);
+    afirmar(el('craftGrid3').style.display !== 'none' && el('craftGrid2').style.display === 'none', 'no se ve la grilla de 3x3');
+    afirmar(cuenta(mc.ID.TABLONES) === 10, 'abrir la mesa gasto tablones (puso un bloque)');
+    const barra = document.querySelectorAll('#invPanel .grid')[2].children, celdas = document.querySelectorAll('#craftGrid3 .islot');
+    clic(barra[0]); for (const k of [0, 1, 2]) clic(celdas[k], 2); clic(barra[0]);       // 3 tablones arriba, el resto vuelve
+    clic(barra[1]); for (const k of [4, 7]) clic(celdas[k], 2); clic(barra[1]);          // 2 palos al medio y abajo
+    afirmar(mc.resultadoCraft() && mc.resultadoCraft().id === mc.ID.PICO_MADERA, `el resultado es ${JSON.stringify(mc.resultadoCraft())}, se esperaba el pico de madera`);
+    clic(el('craftResultado'));                                               // el pico queda en el cursor
+    tecla('KeyE');                                                            // al cerrar, el pico va a la mochila
+    afirmar(mc.inventory.some(s => s && s.id === mc.ID.PICO_MADERA), 'el pico no llego al inventario');
+    afirmar(cuenta(mc.ID.TABLONES) === 7 && cuenta(mc.ID.PALO) === 8, `quedaron ${cuenta(mc.ID.TABLONES)} tablones y ${cuenta(mc.ID.PALO)} palos, se esperaban 7 y 8`);
+    afirmar(mc.craft.every(c => c === null), 'quedo algo en la grilla');
+  });
+
+  await prueba('creativo: el catalogo tiene pestañas y un buscador que ignora los acentos', async () => {
+    await arena();
+    mc.setCreative(true);
+    tecla('KeyE');
+    const visibles = () => [...document.querySelectorAll('#invPanel .grid')[0].children].filter(c => c.style.display !== 'none').length;
+    const buscar = txt => { const b = el('catalogBuscar'); b.value = txt; b.dispatchEvent(new Event('input')); };
+    const pestana = clave => document.querySelector(`.pestana[data-clave="${clave}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const total = visibles();
+    afirmar(total >= 18, `el catalogo muestra ${total} casillas, se esperaban al menos 18 (bloques y objetos)`);
+    pestana('objetos'); const objetos = visibles();
+    pestana('bloques'); const bloques = visibles();
+    afirmar(objetos >= 8 && bloques >= 10 && objetos + bloques === total, `pestañas: ${objetos} objetos + ${bloques} bloques, total ${total}`);
+    pestana('todo'); buscar('adoquin');
+    afirmar(visibles() === 1, `buscar "adoquin" (sin acento) muestra ${visibles()}, se esperaba 1`);
+    buscar('pico');
+    afirmar(visibles() === 2, `buscar "pico" muestra ${visibles()}, se esperaba 2 (de madera y de piedra)`);
+    buscar('zzz');
+    afirmar(visibles() === 0, 'buscar algo que no existe deberia mostrar 0');
+    buscar(''); afirmar(visibles() === total, 'vaciar el buscador no muestra todo de nuevo');
+    tecla('KeyE'); mc.setCreative(false);
   });
 
   // ---------------- inventario ----------------
@@ -335,13 +518,13 @@ async (filtro = '') => {
 
   await prueba('salud: comer una manzana llena hambre solo si hay hambre y no se pone como bloque', async () => {
     await arena();
-    mc.inventory[0] = { id: 11, count: 3 }; mc.selectSlot(0);
+    mc.inventory[0] = { id: 100, count: 3 }; mc.selectSlot(0);
     P.pitch = -1;                                                                          // mira al piso, donde se pondria un bloque
     P.hambre = 20; mc.mouse.right = true; await dormir(500); mc.mouse.right = false;
-    afirmar(cuenta(11) === 3, 'comio con el hambre llena');
+    afirmar(cuenta(100) === 3, 'comio con el hambre llena');
     afirmar(mc.getBlock(CX, PY + 1, CZ - 1) === 0, 'puso la manzana como si fuera un bloque');
     P.hambre = 10; mc.mouse.right = true;
-    afirmar(await esperar(() => cuenta(11) === 2, 2000), 'no comio teniendo hambre');
+    afirmar(await esperar(() => cuenta(100) === 2, 2000), 'no comio teniendo hambre');
     mc.mouse.right = false;
     afirmar(P.hambre === 14, `hambre ${P.hambre}, se esperaba 14`);
   });
@@ -355,7 +538,7 @@ async (filtro = '') => {
       afirmar(await esperar(() => mc.getBlock(CX, PY + 2, CZ - 1) === 0, 4000), 'no se rompieron las hojas');
     } finally { Math.random = azar; mc.mouse.left = false; }
     const ids = mc.drops.map(d => d.id);
-    afirmar(ids.includes(11), `no solto manzana (soltó: ${ids.join(',') || 'nada'})`);
+    afirmar(ids.includes(100), `no solto manzana (soltó: ${ids.join(',') || 'nada'})`);
     afirmar(ids.includes(5), 'no solto las hojas');
   });
 
@@ -419,6 +602,7 @@ async (filtro = '') => {
     mc.setBlock(CX + 4, PY, CZ + 4, 0);                                        // hoyo en la plataforma
     for (let y = PY + 1; y <= PY + 3; y++) mc.setBlock(CX + 3, y, CZ - 4, 8);  // torre
     mc.inventory[3] = { id: 2, count: 33 }; mc.inventory[12] = { id: 5, count: 7 };
+    mc.inventory[20] = { id: mc.ID.PICO_PIEDRA, count: 1, dano: 7 };           // una herramienta con desgaste
     mc.selectSlot(3);
     mc.setCreative(true);
     mc.setTime(0.6);
@@ -433,6 +617,8 @@ async (filtro = '') => {
     afirmar(e.spawn && Number.isFinite(e.spawn.x) && Number.isFinite(e.spawn.y), 'no se guardo el punto de aparicion');
     afirmar(e.nombre === 'Mundo de prueba', `el nombre guardado es "${e.nombre}"`);
     afirmar(e.inventario[3] && e.inventario[3].count === 33, 'el inventario no se guardo');
+    afirmar(e.inventario[20] && e.inventario[20].dano === 7, `el desgaste de la herramienta no se guardo: ${JSON.stringify(e.inventario[20])}`);
+    afirmar(e.itemsV === 2, `falta la marca itemsV (vale ${e.itemsV})`);
     const c = e.chunks.find(c => c.cx === Math.floor(CX / 16) && c.cz === Math.floor(CZ / 16));
     afirmar(c, 'el chunk de la plataforma no esta en el archivo');
     afirmar(c.data instanceof Uint8Array && c.data.length === 16 * 64 * 16, 'los datos del chunk no son un Uint8Array de 16384 bytes');

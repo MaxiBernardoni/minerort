@@ -3,14 +3,16 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { CONFIG, QUALITY, BLOCKS, CS, H, WATER, isSolidB } from './config.js';
+import { CONFIG, QUALITY, ID, BLOCKS, ITEMS, CS, H, WATER, isSolidB } from './config.js';
+import { velocidadDeMinado, puedeRecoger, buscarReceta, maxPila } from './objetos.js';
+import { itemSprites } from './textures.js';
 import { renderer, scene, camera, handScene, handCamera, canvas, sun, applyRenderScale, renderScale } from './scene.js';
 import { chunks, chunkKey, savedChunks, heightAt, getBlock, setBlock, updateChunks } from './world.js';
 import { skyMesh, updateSky, daylight, setTime, skipTime, clockString } from './sky.js';
 import { crackMesh, setCrackStage, hand, startSwing, spawnBreakParticles, updateParticles, updateHand } from './effects.js';
 import { thirdPerson, setThirdPerson, updateCharacter } from './character.js';
 import {
-  inventory, invAdd, heldId, consumeHeld, selected, selectSlot, invOpen, openInventory, closeInventory,
+  inventory, craft, resultadoCraft, invAdd, heldId, consumeHeld, gastarHerramienta, selected, selectSlot, invOpen, openInventory, closeInventory,
   hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop,
 } from './inventory.js';
 import { player, mouse, lookDir } from './player.js';
@@ -219,8 +221,8 @@ function updateMining(dt) {
   if (!mining.active || mining.x !== target.x || mining.y !== target.y || mining.z !== target.z) {
     mining.active = true; mining.x = target.x; mining.y = target.y; mining.z = target.z; mining.p = 0;
   }
-  const b = getBlock(mining.x, mining.y, mining.z);
-  mining.p += dt * CONFIG.breakSpeed / BLOCKS[b].hardness;
+  const b = getBlock(mining.x, mining.y, mining.z), bloque = BLOCKS[b], mano = heldId();
+  mining.p += dt * CONFIG.breakSpeed * velocidadDeMinado(mano, bloque) / bloque.hardness;   // la herramienta correcta lo acelera
   hand.mining = true;
   crackMesh.visible = true;
   crackMesh.position.set(mining.x + 0.5, mining.y + 0.5, mining.z + 0.5);
@@ -228,7 +230,8 @@ function updateMining(dt) {
   if (mining.p >= 1) {
     spawnBreakParticles(mining.x, mining.y, mining.z, b);
     setBlock(mining.x, mining.y, mining.z, 0);
-    dropForBlock(b, mining.x, mining.y, mining.z);          // suelta el objeto (inventory.js)
+    if (puedeRecoger(mano, bloque)) dropForBlock(b, mining.x, mining.y, mining.z);   // suelta el objeto (la piedra sin pico no suelta nada)
+    gastarHerramienta();                                    // la herramienta pierde un uso (y se rompe al agotarse)
     gastar(0.005);                                          // romper cansa un poquito
     mining.active = false; mining.p = 0; mining.delay = 0.18;
     crackMesh.visible = false;
@@ -237,12 +240,14 @@ function updateMining(dt) {
 
 // Devuelve los segundos hasta poder repetir (comer es mas lento que poner un bloque)
 function placeBlock() {
+  // click derecho sobre una mesa de crafteo: se abre la mesa (en vez de poner un bloque pegado a ella)
+  if (target && getBlock(target.x, target.y, target.z) === ID.MESA) { openInventory(3); return 0.5; }
   const id = heldId();
   if (!id) return 0.22;                                     // mano vacia: no hay nada para poner
-  const comida = BLOCKS[id].food;
-  if (comida) {                                             // la comida no se pone: se come (solo si hay hambre)
-    if (comer(comida)) { consumeHeld(); startSwing(); }
-    return 0.8;
+  const objeto = ITEMS[id];
+  if (objeto) {                                             // los objetos no se ponen: la comida se come (solo si hay hambre), el resto no hace nada
+    if (objeto.food && comer(objeto.food)) { consumeHeld(); startSwing(); }
+    return objeto.food ? 0.8 : 0.22;
   }
   if (!target) return 0.22;
   const px = target.x + target.nx, py = target.y + target.ny, pz = target.z + target.nz;
@@ -384,5 +389,6 @@ setTimeout(async () => {
 window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, guardarAhora: guardarPartida, mundoId, getBlock, setBlock, heightAt, scene, camera, setTime,
               renderer, spawnBreakParticles, hand, mining, startSwing, selectSlot, sun, mouse,
               applyQuality, applyRenderScale, inventory, invAdd, openInventory, closeInventory, setThirdPerson, drops, spawnDrop, setCreative,
+              craft, resultadoCraft, ID, ITEMS, itemSprites, buscarReceta, maxPila,
               salud: { danar, curar, comer, gastar, actualizar: actualizarSalud, resetear: resetearSalud, reaparecer },
               setLocked: v => { locked = v; } };

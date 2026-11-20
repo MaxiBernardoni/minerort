@@ -129,6 +129,10 @@ async (modo) => {
       afirmar(mc.chunks.size >= 200, `solo ${mc.chunks.size} chunks`);
       afirmar(Math.abs(mc.player.pos.x - 8.5) < 0.01 && Math.abs(mc.player.pos.y - 40) < 0.01, `posicion ${mc.player.pos.x}, ${mc.player.pos.y}`);
     });
+    await prueba('la manzana de la version anterior (id 11) pasa a ser la manzana nueva, no una mesa de crafteo', async () => {
+      const s = mc.inventory[0];
+      afirmar(s && s.id === mc.ID.MANZANA && s.count === 2, `la casilla 1 tiene ${JSON.stringify(s)}, se esperaba la manzana (id ${mc.ID.MANZANA}) x2`);
+    });
     return resultados;
   }
 

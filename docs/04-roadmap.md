@@ -45,26 +45,26 @@ Preparar el terreno para que el resto no se rompa. No agrega nada visible.
 
 > **La Fase 1 está completa.** Decisiones que tomó la IA donde el roadmap no decía nada, todas fáciles de cambiar: la comida es solo la manzana (sin ella el hambre sería solo un castigo); al morir se conserva el inventario; la inanición no mata; el menú recarga la página en vez de reiniciar el estado a mano.
 
-### Fase 2 · Crafteo y herramientas
+### Fase 2 · Crafteo y herramientas ✅
 
-| Función | Depende de | Qué toca |
+| Función | Depende de | Qué se hizo (2026-11-20) |
 |---|---|---|
-| **Más bloques y objetos que no son bloques** (palos, herramientas) | Un registro de ítems distinto del de bloques | `config.js`, `textures.js`, `inventory.js`. Hoy un ítem es un id de `BLOCKS`; la **manzana** (id 11, con `food`) ya es un objeto que no se pone, pero se dibuja como cubo. Hace falta un modelo plano para objetos y separar el registro de ítems del de bloques. |
-| **Mesa de crafteo y recetas** | Ítems | `inventory.js` y UI. |
-| **Herramientas y durabilidad** | Ítems | `game.js` (`updateMining` usa solo `hardness`), `config.js`. |
-| **Mejor inventario** (ver abajo) | Ítems | `inventory.js`. |
+| ✅ **Objetos que no son bloques** | Un registro de ítems distinto del de bloques | `ITEMS` (ids desde 100) separado de `BLOCKS` (ids 1–99), con `ID` para los nombres. Ocho objetos: manzana, palo, y pico, hacha y pala de madera y de piedra. Se dibujan como sprites planos con espesor (mano, suelo e inventario). |
+| ✅ **Mesa de crafteo y recetas** | Ítems | Bloque nuevo (id 11) que se abre con click derecho, grilla de 3×3 y casilla de resultado. En el inventario hay una de 2×2. Recetas de forma, en cualquier posición y espejadas (`objetos.js`). |
+| ✅ **Herramientas y durabilidad** | Ítems | Velocidad ×2 (madera) y ×4 (piedra) para su tipo de bloque, desgaste de 1 por bloque roto (59 y 131 usos), barrita de desgaste, y la piedra, el adoquín y el ladrillo solo sueltan algo con pico. |
+| ✅ **Mejor inventario** (ver abajo) | Ítems | Crafteo integrado, herramientas que no se apilan, y catálogo creativo con pestañas y buscador. |
 
-**"Mejor inventario" = que se parezca más al de Minecraft original** (definición de Max). Concretamente, tomando como referencia el original (a validar con Max):
+**"Mejor inventario" = que se parezca más al de Minecraft original** (definición de Max). Estado de cada punto de la lista que se propuso:
 
-- Cuadrícula de crafteo 2×2 dentro del inventario, con su casilla de resultado.
-- Cuatro ranuras de armadura y un muñeco del jugador al lado.
-- Ranura de la mano secundaria.
-- Mesa de crafteo con cuadrícula 3×3 (pantalla aparte).
-- Íconos y nombres para ítems que no son bloques (palos, herramientas).
-- En creativo, un catálogo con pestañas por categoría y buscador.
-- Estilo visual y comportamiento de los clicks fieles al original (hoy ya hay click, click derecho, Shift+click y las teclas 1–9).
+- ✅ Cuadrícula de crafteo 2×2 dentro del inventario, con su casilla de resultado.
+- ✅ Mesa de crafteo con cuadrícula 3×3.
+- ✅ Íconos y nombres para objetos que no son bloques (palos, herramientas).
+- ✅ En creativo, un catálogo con pestañas por categoría y buscador.
+- ⬜ **Cuatro ranuras de armadura y un muñeco del jugador al lado.** *Se dejó afuera a propósito:* no hay armaduras, así que serían ranuras que no hacen nada. Conviene hacerlo junto con las armaduras.
+- ⬜ **Ranura de la mano secundaria.** Igual: no hay nada que ponga en la otra mano todavía.
+- ⬜ Estilo visual y comportamiento de los clicks **fieles al original**: ya hay click, click derecho, Shift+click y las teclas 1–9, pero faltan cosas como arrastrar para repartir una pila o el doble click para juntar.
 
-Hoy el inventario tiene 36 espacios, pilas de 64 y modo creativo; falta todo lo de la lista, salvo lo ya existente.
+> **Decisiones que tomó la IA donde el roadmap no decía nada** (todas fáciles de cambiar, ver [02-estado-actual.md](02-estado-actual.md#crafteo-y-herramientas)): qué objetos y recetas hay; que la piedra necesite pico (cambia el ritmo del comienzo: con el kit inicial se puede fabricar todo); los números de velocidad y duración (salen de Minecraft); que cada bloque roto gaste un uso aunque no sea el tipo de la herramienta; que no haya "niveles" de herramienta; y que el click derecho sobre una mesa siempre la abra.
 
 ### Fase 3 · Mundo más rico
 

@@ -8,25 +8,32 @@ Mi propia versión de Minecraft. Electron + Three.js, mundo generado por código
 npm install     # solo la primera vez
 npm start
 npm test        # pruebas automáticas (unos 30 segundos, sin mostrar ventana)
+npm run captura # saca capturas del juego en capturas/ para revisar cómo se ve
 ```
 
 ## Controles
 
-WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq. mantenido: romper · click der.: poner (o comer, si tenés una manzana en la mano) · 1-9 o rueda: elegir ranura · E: inventario · F volar · V primera/tercera persona · T avanzar la hora · G sombras · K calidad (alta/media/baja) · Esc pausa · F12 consola
+WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq. mantenido: romper · click der.: poner (o comer una manzana, o abrir una mesa de crafteo) · 1-9 o rueda: elegir ranura · E: inventario · F volar · V primera/tercera persona · T avanzar la hora · G sombras · K calidad (alta/media/baja) · Esc pausa · F12 consola
 
 ## Inventario
 
 - 36 espacios: barra rápida (1-9) + mochila. Los bloques que rompés caen al suelo y se recogen al acercarte; al poner uno se gasta.
 - Pantalla (E): click agarra/suelta, click derecho mitad/uno, Shift+click mueve rápido, 1-9 sobre un espacio lo manda a la barra, click afuera lo tira.
-- Modo creativo (botón dentro del inventario): catálogo de todos los bloques y no se gasta nada. `CONFIG.creative` lo deja activado desde el inicio.
-- Piedra suelta adoquín, césped suelta tierra, hojas sueltan a veces (ver `drop` en `src/config.js`).
+- Modo creativo (botón dentro del inventario): catálogo de todos los bloques y objetos, con pestañas (Todo / Bloques / Objetos) y un buscador. No se gasta nada. `CONFIG.creative` lo deja activado desde el inicio.
+- Césped suelta tierra, hojas sueltan a veces (ver `drop` en `src/config.js`). **La piedra, el adoquín y el ladrillo solo sueltan algo si los rompés con un pico.**
+
+## Crafteo y herramientas
+
+- **Crafteo:** el inventario (E) tiene una grilla de 2×2; la **mesa de crafteo** (click derecho sobre ella) tiene una de 3×3. Poné los ingredientes y sacá el resultado (Shift+click: todo lo que se pueda). Las recetas no dependen de la posición ni del lado.
+- **Recetas:** 1 madera → 4 tablones · 2 tablones uno sobre otro → 4 palos · 4 tablones en cuadrado → mesa de crafteo · pico, hacha y pala de tablones o de adoquín con palos (3×3 de la mesa).
+- **Herramientas:** el pico rompe más rápido piedra, adoquín y ladrillo; el hacha, madera, tablones y mesa; la pala, tierra, césped y arena. Las de madera ×2 (59 usos) y las de piedra ×4 (131 usos). Se desgastan (barrita en el inventario) y se rompen al agotarse. No se apilan.
 
 ## Salud (supervivencia)
 
 - 10 corazones de vida y 10 muslos de hambre, sobre la barra rápida. En creativo no hay daño ni hambre.
 - Caer más de 3 bloques duele (8 bloques = 5 puntos); al agua no. Correr, saltar, nadar y romper bloques dan hambre; caminar no.
 - Con el hambre llena la vida se regenera. Sin comida el hambre llega a 0 y la vida baja hasta 1 corazón, pero no te morís de hambre.
-- La **manzana** (a veces la sueltan las hojas) restaura hambre: click derecho con ella en la mano.
+- La **manzana** (a veces la sueltan las hojas) restaura hambre: click derecho con ella en la mano. Es un objeto plano, no un bloque.
 - Al morir aparece el botón **Reaparecer**: conservás el inventario y volvés al punto de partida del mundo.
 - `CONFIG.hambre` y `CONFIG.danoCaida` en `src/config.js` apagan el hambre y el daño por caída.
 
@@ -66,7 +73,7 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 | `main.js` | Ventana de Electron y guardar al cerrar |
 | `preload.js` | Puente entre el juego y Electron (solo `window.guardado`) |
 | `guardado-main.js` | Lee y escribe los mundos (una carpeta por mundo) |
-| `test/` | Las pruebas automáticas (`npm test`) |
+| `test/` | Las pruebas automáticas (`npm test`) y las capturas (`npm run captura`) |
 
 ## Rendimiento
 

@@ -14,7 +14,7 @@
 // el generador de terreno, los chunks viejos guardados quedarian distintos a sus vecinos nuevos.
 // Agregar campos opcionales al estado no obliga a subir VERSION (los que faltan toman un valor por defecto).
 // ============================================================
-import { CONFIG } from './config.js';
+import { CONFIG, ID } from './config.js';
 import { chunks, savedChunks, chunkKey } from './world.js';
 import { dayT, setTime } from './sky.js';
 import { inventory, creative, selected, setCreative, selectSlot, toast } from './inventory.js';
@@ -38,7 +38,8 @@ async function guardarPartida() {
     hora: dayT,
     creativo: creative,
     seleccionado: selected,
-    inventario: inventory.map(s => s && { id: s.id, count: s.count }),
+    itemsV: 2,                                                    // 2 = la manzana es el id 100 (antes era el 11, hoy la mesa de crafteo)
+    inventario: inventory.map(s => s && { id: s.id, count: s.count, dano: s.dano }),   // dano = usos gastados de una herramienta
     vida: player.vida, hambre: player.hambre, saturacion: player.saturacion,
     spawn: player.spawn,
     jugador: { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw, pitch: player.pitch, vuela: player.fly },
@@ -66,6 +67,8 @@ async function cargarPartida() {
   CONFIG.seed = e.semilla;
   for (const c of e.chunks) savedChunks.set(chunkKey(c.cx, c.cz), { cx: c.cx, cz: c.cz, maxY: c.maxY, data: c.data });
   setCreative(e.creativo);
+  // Una partida anterior a los objetos nuevos (sin itemsV) tenia la manzana como id 11, que hoy es la mesa de crafteo
+  if (!e.itemsV) for (const s of e.inventario) if (s && s.id === 11) s.id = ID.MANZANA;
   inventory.fill(null);
   e.inventario.forEach((s, i) => { inventory[i] = s; });
   selectSlot(e.seleccionado);                                     // tambien refresca la interfaz del inventario

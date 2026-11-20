@@ -47,6 +47,7 @@ async (modo) => {
     afirmar(stack(0) === '7x16' && stack(1) === '8x8' && stack(2) === '9x8', `barra: ${stack(0)} ${stack(1)} ${stack(2)}`);
     afirmar(stack(3) === '2x33', `ranura 4: ${stack(3)}, se esperaba 2x33`);
     afirmar(stack(12) === '5x7', `ranura 13: ${stack(12)}, se esperaba 5x7`);
+    afirmar(stack(20) === `${mc.ID.PICO_PIEDRA}x1` && mc.inventory[20].dano === 7, `ranura 21: ${stack(20)} con desgaste ${mc.inventory[20] && mc.inventory[20].dano}, se esperaba el pico de piedra con desgaste 7`);
     const sel = [...document.querySelectorAll('#hotbar .slot')].findIndex(s => s.classList.contains('sel'));
     afirmar(sel === 3, `ranura elegida ${sel + 1}, se esperaba la 4`);
     afirmar(el('modeBtn').textContent === 'Modo: Creativo', 'no volvio el modo creativo');

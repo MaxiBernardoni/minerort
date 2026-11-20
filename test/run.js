@@ -114,7 +114,8 @@ app.whenReady().then(async () => {
       // Migracion: la partida unica de la version anterior era un mundo.json.gz suelto en la carpeta de datos
       try {
       escribir(base, {
-        version: 1, semilla: 777, hora: 0.3, creativo: false, seleccionado: 0, inventario: Array(36).fill(null),
+        // (sin itemsV: en esa version la manzana era el id 11, que hoy es la mesa de crafteo)
+        version: 1, semilla: 777, hora: 0.3, creativo: false, seleccionado: 0, inventario: [{ id: 11, count: 2 }, ...Array(35).fill(null)],
         jugador: { x: 8.5, y: 40, z: 8.5, yaw: 0, pitch: 0, vuela: false }, chunks: [],
       }, 'x');
       fs.rmSync(path.join(base, 'meta.json'));                   // la version anterior no tenia meta.json

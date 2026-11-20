@@ -1,6 +1,6 @@
 # 03 · Arquitectura
 
-> Última revisión: 2026-11-19 · Corresponde al código después de completar la Fase 1 (salud, varios mundos y menú). Hay cambios sin commitear desde `398be37`.
+> Última revisión: 2026-11-20 · Corresponde al código después de completar la Fase 2 (objetos, crafteo y herramientas). Hay cambios sin commitear desde `d83d997`.
 > Este documento está pensado para dárselo a una IA al empezar una sesión. Los nombres de archivos y funciones salen del código real.
 
 ## Vista general
@@ -41,7 +41,8 @@ game.js ─▶ todos los de abajo
 guardado.js ─▶ inventory, sky, world, player, config
 salud.js ─▶ inventory, player, config
 menu.js ─▶ (nada: solo usa window.guardado y el HTML)
-inventory.js ─▶ player, effects, sky, world, scene, textures, config
+inventory.js ─▶ objetos, player, effects, sky, world, scene, textures, config
+objetos.js ─▶ config
 character.js ─▶ effects, scene
 effects.js ─▶ sky, world, scene, textures, config
 sky.js ─▶ world, scene, textures, config
@@ -55,16 +56,17 @@ config.js ─▶ (nada)
 
 | Archivo | Exporta | Importa de |
 |---|---|---|
-| `config.js` | `CONFIG`, `QUALITY`, `BLOCKS`, `CS`, `H`, `WATER`, `LEAVES`, `ITEM_IDS`, `isSolidB`, `isOpaque` | — |
-| `textures.js` | `atlasTexture`, `waterTexture`, `crackTextures`, `tileUV`, `tileAvg`, `makeBlockIcon`, `hash2`, `tn`, `smooth`, `lerp` | `config` |
+| `config.js` | `CONFIG`, `QUALITY`, `ID`, `BLOCKS`, `ITEMS`, `itemInfo`, `CS`, `H`, `WATER`, `LEAVES`, `ITEM_IDS`, `isSolidB`, `isOpaque` | — |
+| `objetos.js` | `maxPila`, `RECETAS`, `buscarReceta`, `velocidadDeMinado`, `puedeRecoger`, `esHerramienta`, `MAX_PILA` | `config` |
+| `textures.js` | `atlasTexture`, `waterTexture`, `crackTextures`, `itemSprites`, `tileUV`, `tileAvg`, `makeBlockIcon`, `hash2`, `tn`, `smooth`, `lerp` | `config` |
 | `scene.js` | `canvas`, `renderer`, `scene`, `camera`, `handScene`, `handCamera`, `sun`, `hemi`, `shadow`, `fogFar()`, `applyRenderScale`, `renderScale` | `config` |
 | `player.js` | `player` (posición, velocidad y también vida, hambre, punto de aparición…), `mouse`, `lookDir` | — |
 | `world.js` | `chunks`, `savedChunks`, `chunkKey`, `heightAt`, `getBlock`, `setBlock`, `updateChunks`, `resetLoadRadius`, `FACES`, `QUV`, `waterMaterial`, `windUniform` | `config`, `textures`, `scene` |
 | `quality.js` | `applyQuality` | `config`, `scene`, `world` |
 | `sky.js` | `skyMesh`, `updateSky`, `daylight`, `setTime`, `skipTime`, `clockString` | `config`, `textures`, `scene`, `world` |
-| `effects.js` | `hand`, `setHandBlock`, `updateHand`, `startSwing`, `makeBlockGeometry`, `pixelBox`, `SKIN`, `SHIRT`, partículas y grietas | `config`, `textures`, `scene`, `world`, `sky` |
+| `effects.js` | `hand`, `setHandBlock`, `updateHand`, `startSwing`, `makeBlockGeometry`, `esItem`, `makeItemGeometry`, `itemMaterial`, `HAND_TIP_Z`, `pixelBox`, `SKIN`, `SHIRT`, partículas y grietas | `config`, `textures`, `scene`, `world`, `sky` |
 | `character.js` | `thirdPerson`, `setThirdPerson`, `updateCharacter(player, dt, …)` | `scene`, `effects` |
-| `inventory.js` | `inventory`, `invAdd`, `heldId`, `consumeHeld`, `selected`, `selectSlot`, `invOpen`, `openInventory`, `closeInventory`, `toast`, `setCreative`, `drops`, `spawnDrop`, `dropForBlock`, `updateDrops`, … | `config`, `textures`, `scene`, `world`, `sky`, `effects`, `player` |
+| `inventory.js` | `inventory`, `craft`, `resultadoCraft`, `invAdd`, `heldId`, `consumeHeld`, `gastarHerramienta`, `selected`, `selectSlot`, `invOpen`, `openInventory(lado)`, `closeInventory`, `toast`, `setCreative`, `drops`, `spawnDrop`, `dropForBlock`, `updateDrops`, … | `config`, `objetos`, `textures`, `scene`, `world`, `sky`, `effects`, `player` |
 | `salud.js` | `danar`, `curar`, `comer`, `gastar`, `alAterrizar`, `actualizarSalud`, `resetearSalud`, `reaparecer`, `MAX` | `config`, `inventory`, `player` |
 | `menu.js` | `mostrarMenu` | — |
 | `guardado.js` | `mundoId`, `cargarPartida`, `guardarPartida`, `iniciarGuardado`, `volverAlMenu` | `config`, `world`, `sky`, `inventory`, `player` |
@@ -74,8 +76,9 @@ config.js ─▶ (nada)
 
 | Archivo | Líneas | Responsabilidad |
 |---|---|---|
-| `src/config.js` | 90 | Valores ajustables y definición de bloques y objetos (ver abajo). |
-| `src/textures.js` | 245 | Dibuja todas las texturas con canvas 2D: ruido tileable, ruido celular. Arma un atlas de 12 tiles. |
+| `src/config.js` | 120 | Valores ajustables y definición de bloques (`BLOCKS`) y objetos (`ITEMS`) (ver abajo). |
+| `src/objetos.js` | 76 | Las recetas de crafteo y las reglas de las herramientas (velocidad, qué suelta cada bloque, cuántos caben por casilla). Funciones puras. |
+| `src/textures.js` | 339 | Dibuja todas las texturas con canvas 2D: ruido tileable, ruido celular. Arma un atlas de 13 tiles (los bloques) y los sprites planos de los objetos (manzana, palo, herramientas). |
 | `src/scene.js` | 63 | Renderer WebGL, cámaras, luz del sol/luna con sombras, resolución adaptativa. |
 | `src/quality.js` | 34 | Presets de calidad (alta/media/baja) aplicados en caliente con la tecla K. |
 | `src/player.js` | 25 | Estado compartido del jugador (incluida la salud) y del mouse, y hacia dónde mira. |
@@ -83,35 +86,68 @@ config.js ─▶ (nada)
 | `src/menu.js` | 82 | Menú principal: lista, crea y borra mundos. |
 | `src/world.js` | 391 | Terreno, chunks, árboles, acceso a bloques, generación de mallas, carga/descarga. |
 | `src/sky.js` | 165 | Domo de cielo con shader, nubes, ciclo día/noche, la luz y la cámara de sombras. |
-| `src/effects.js` | 172 | Partículas, grietas al romper, mano animada. |
+| `src/effects.js` | 239 | Partículas, grietas al romper, mano animada, y el modelo de los objetos planos. |
 | `src/character.js` | 94 | Cuerpo del jugador visible en tercera persona. |
-| `src/inventory.js` | 348 | Datos y UI del inventario, drops en el mundo. |
+| `src/inventory.js` | 500 | Datos y UI del inventario, crafteo (grillas de 2×2 y 3×3), desgaste de herramientas, catálogo creativo y objetos soltados en el mundo. |
 | `src/guardado.js` | 110 | Arma y aplica el estado de la partida (qué se guarda), el mundo elegido por la dirección, el autoguardado y el botón "Guardar y volver al menú". |
-| `src/game.js` | 388 | Entrada del juego: física del jugador (incluida la caída), raycast, controles, minado/colocación/comer, bucle `frame()`, arranque (muestra el menú o carga el mundo antes de generarlo). |
-| `test/run.js` | 151 | `npm test`: abre el juego en Electron sin ventana, corre las pruebas (también reiniciando el juego, creando y borrando mundos) y devuelve código 0 o 1. Usa una carpeta temporal. No es parte del juego. |
-| `test/pruebas.js` | 444 | Las pruebas del juego en marcha, que se ejecutan dentro de la página. |
-| `test/pruebas-reinicio.js` | 72 | Las pruebas que se ejecutan después de reiniciar el juego (¿volvió la partida?). |
-| `test/pruebas-menu.js` | 136 | Las pruebas del menú principal, los varios mundos y la migración. |
+| `src/game.js` | 394 | Entrada del juego: física del jugador (incluida la caída), raycast, controles, minado/colocación/comer, bucle `frame()`, arranque (muestra el menú o carga el mundo antes de generarlo). |
+| `test/run.js` | 152 | `npm test`: abre el juego en Electron sin ventana, corre las pruebas (también reiniciando el juego, creando y borrando mundos) y devuelve código 0 o 1. Usa una carpeta temporal. No es parte del juego. |
+| `test/pruebas.js` | 630 | Las pruebas del juego en marcha, que se ejecutan dentro de la página. |
+| `test/captura.js` | 106 | `npm run captura`: saca capturas del juego (mano, suelo, inventario, crafteo, mesa, barra, sprites ampliados) para poder mirarlas. No es parte del juego. |
+| `test/pruebas-reinicio.js` | 73 | Las pruebas que se ejecutan después de reiniciar el juego (¿volvió la partida?). |
+| `test/pruebas-menu.js` | 140 | Las pruebas del menú principal, los varios mundos y la migración. |
 
 ## Modelo de datos
 
-### Bloques (`config.js`)
+### Bloques y objetos (`config.js`)
 
-`BLOCKS` es un objeto por **id numérico** (1–10 son bloques del mundo, el 11 es la manzana, que es un objeto; 0 es aire):
+Hay **dos registros**, y un mismo id numérico nunca está en los dos:
+
+- **`BLOCKS`: lo que existe en el mundo.** Ids del **1 al 99** (hoy 1–11; el 10 es el agua; el 11 es la mesa de crafteo; 0 es aire).
+- **`ITEMS`: lo que NO es un bloque** (no se pone en el mundo). Ids desde el **100**: manzana (100), palo (101) y pico, hacha y pala de madera (102, 104, 106) y de piedra (103, 105, 107).
+- `ID` da nombres a los ids más usados (`ID.MESA`, `ID.PALO`, `ID.PICO_PIEDRA`…): usarlos en vez de números sueltos. `itemInfo(id)` devuelve los datos de un id sea bloque u objeto (nombre, etc.). Un bloque también puede estar en el inventario con su mismo id.
 
 ```js
-1: { name: 'Césped', tiles: [0, 2, 1], hardness: 0.5, drop: 2 }
-//      nombre       [arriba, abajo, lados]  segundos para romper   qué suelta
+3: { name: 'Piedra', tiles: [3, 3, 3], hardness: 1.1, drop: 9, herramienta: 'pico', necesita: true }
+//     nombre         [arriba, abajo, lados]  segundos a mano  qué suelta   la rompe mejor el pico    sin pico no suelta nada
 ```
 
-- `tiles`: índices en el atlas de texturas.
-- `drop`: id del bloque que suelta (por defecto, el mismo). `dropChance`: probabilidad (por defecto 1).
-- `extra: { id, chance }`: además de lo anterior, suelta otro objeto con esa probabilidad (las hojas dan manzanas, 3%).
-- `food: n`: objeto que **no se pone** y se come con click derecho, devolviendo `n` de hambre (la manzana, 4). Es el único caso hoy de un "objeto que no es bloque": se dibuja como cubo con su textura hasta que haya objetos planos (Fase 2).
-- `ITEM_IDS` es la lista de lo que puede estar en el inventario y en el catálogo creativo (1–9 y 11; el agua queda afuera).
+Campos de un **bloque**:
+- `tiles`: índices en el atlas de texturas. `hardness`: segundos para romperlo con la mano.
+- `drop`: id que suelta (por defecto, el mismo). `dropChance`: probabilidad (por defecto 1).
+- `extra: { id, chance }`: además, suelta otro objeto con esa probabilidad (las hojas dan manzanas, 3%).
+- `herramienta`: `'pico'`, `'hacha'` o `'pala'`, la que lo rompe más rápido. `necesita: true`: solo suelta algo si se rompe con esa herramienta (piedra, adoquín y ladrillo con pico).
+
+Campos de un **objeto**:
+- Su dibujo es un sprite de 16×16 con **el mismo id** en `itemSprites` (`textures.js`, `paintSprite` o `spriteDePixeles`), no una cara del atlas.
+- `food: n`: se come con click derecho y devuelve `n` de hambre (la manzana, 4).
+- `tool: 'pico'|'hacha'|'pala'`, `velocidad` (multiplicador al romper bloques de ese tipo), `dur` (usos hasta romperse) y `agarre: [x, y]` (el píxel por donde la mano la agarra).
+- `ITEM_IDS` (todos los bloques menos el agua, y todos los objetos) es lo que puede estar en el inventario y en el catálogo creativo.
 - `isSolidB` (se puede chocar/apuntar: todo menos aire y agua) e `isOpaque` (tapa caras vecinas: todo menos aire, hojas y agua) son las dos reglas físicas y visuales.
 
-**Para agregar un bloque** hay que tocar: `BLOCKS` y `ITEM_IDS` en `config.js`, una textura en `textures.js` y subir `NTILES`, y el arreglo `OPAQUE` de `world.js` (hoy se llena con un bucle `for b = 1..9`, así que un id nuevo no entra solo).
+**Para agregar un bloque:** `BLOCKS` en `config.js` (y un nombre en `ID` si lo van a usar otros), una o más texturas en `textures.js` con `paint(...)` y subir `NTILES`. (`OPAQUE` en `world.js` ya se arma solo con las claves de `BLOCKS`.)
+**Para agregar un objeto:** una entrada en `ITEMS`, un nombre en `ID`, un sprite en `textures.js`, y si se fabrica, una receta en `objetos.js`. Nada más: la mano, el suelo, el ícono y el catálogo creativo ya lo dibujan solos.
+
+### Objetos y recetas (`objetos.js`)
+
+Todo puro (sin pantalla): se prueba solo.
+
+- `maxPila(id)`: cuántos caben por casilla. 64, salvo las herramientas (1: tienen su propio desgaste).
+- `RECETAS`: lista de `{ forma, da }`. `forma` son filas de ids con `0` = vacío; `da` es `[id, cantidad]`. Cada material (tablones, adoquín) genera pico, hacha y pala con un bucle.
+- `buscarReceta(grilla, ancho)`: recibe los ids en orden de filas (`ancho` = 2 en el inventario, 3 en la mesa), **recorta la caja ocupada** (así la receta se reconoce en cualquier posición) y la compara con cada forma **y con su espejo**. Devuelve `{ id, count }` o `null`.
+- `velocidadDeMinado(idEnMano, bloque)`: multiplicador de velocidad (1 si no es la herramienta correcta). `puedeRecoger(idEnMano, bloque)`: ¿suelta algo? (falso para un bloque con `necesita` sin la herramienta). `esHerramienta(id)`.
+
+### Inventario, crafteo y desgaste (`inventory.js`)
+
+- `inventory`: 36 casillas, cada una `null` o `{ id, count, dano }`. Espacios 0–8 = barra rápida. `dano` son los usos gastados de una herramienta (ausente = 0). Las pilas se arman con `nuevaPila(id, count, dano)` para que **el desgaste viaje con la herramienta** al moverla, partirla, tirarla (`spawnDrop(..., dano)`), recogerla y guardar.
+- **Casillas de la pantalla:** los "índices" son 0–35 (el inventario), `100 + k` (la casilla `k` de la grilla de crafteo) y `200` (el resultado). `stackAt(i)` y `setAt(i, valor)` leen y escriben cualquiera de los tres, así `slotClick` es el mismo para todo.
+- **Grilla de crafteo:** `craft` (9 casillas) y `craftLado` (2 al abrir con la tecla E, 3 al abrir la mesa). Hay dos grillas dibujadas (`#craftGrid2`, `#craftGrid3`) y se muestra una. El resultado se recalcula en cada `refreshInventoryUI` con `buscarReceta`. Click en el resultado: lo saca al cursor y gasta una unidad de cada ingrediente (`consumirIngredientes`); Shift+click repite mientras entre en la mochila. **Al cerrar** (`closeInventory`), lo que quedó en la grilla vuelve a la mochila.
+- **Mesa de crafteo:** es el bloque `ID.MESA` (11). `placeBlock` en `game.js` la detecta antes de poner nada: click derecho sobre ella llama a `openInventory(3)`.
+- **Desgaste:** `game.js` llama a `gastarHerramienta()` al romper cada bloque; suma un uso y, al llegar a `dur`, quita la herramienta. `renderSlot` dibuja la barrita (verde → roja) sobre el ícono.
+- **Modo creativo:** el catálogo (`catalogSlots`) tiene pestañas (Todo/Bloques/Objetos) y un buscador (`filtrarCatalogo`, que ignora acentos). El 2×2 se oculta en creativo, pero la mesa siempre se ve.
+- Estado del módulo: `selected` (espacio activo), `cursor` (pila arrastrada), `invOpen`, `creative`, `resultado`.
+- La UI se redibuja con `refreshInventoryUI()` después de cada cambio.
+- `drops`: objetos sueltos en el mundo (máximo 120, desaparecen a los 300 s).
 
 ### Chunks (`world.js`)
 
@@ -129,12 +165,13 @@ config.js ─▶ (nada)
 - `generateChunk`: rellena capas (césped/tierra/piedra o arena), agua hasta `seaLevel`, y planta árboles. Los árboles miran las columnas vecinas (±2) para que las copas crucen bordes de chunk de forma consistente.
 - Todo sale de `hash2` con la semilla: **mismo seed = mismo mundo**.
 
-### Inventario (`inventory.js`)
+### Objetos planos y la mano (`effects.js`)
 
-- `inventory`: arreglo de 36 espacios, cada uno `null` o `{ id, count }`. Espacios 0–8 = barra rápida.
-- Estado del módulo: `selected` (espacio activo), `cursor` (pila arrastrada), `invOpen`, `creative`.
-- La UI se redibuja con `refreshInventoryUI()` después de cada cambio.
-- `drops`: objetos sueltos en el mundo (máximo 120, desaparecen a los 300 s).
+- **Cómo se dibuja un objeto plano:** `makeItemGeometry(id, enMano)` convierte el sprite en una malla con espesor (un voxel de 2 píxeles de grosor por cada píxel opaco, con frente, dorso y los costados que dan al vacío, más oscuros). `itemMaterial(id)` da su material (una textura por objeto, sin suavizado). Se usa en tres lugares: la mano (`setHandBlock`), los objetos del suelo (`spawnDrop` en `inventory.js`) y el ícono (`makeBlockIcon` en `textures.js` dibuja el sprite plano en vez de un cubo isométrico). **Todo id con `sprite` tiene que pasar por estas funciones, no por `makeBlockGeometry`** (que busca `tiles` y falla).
+- **El brazo** (`armMesh`) mide 0.8 de largo y está corrido 0.25 hacia atrás, así que su punta (la mano) queda en `HAND_TIP_Z = -0.15` del espacio de `handGroup`. El bloque u objeto sostenido se coloca ahí; antes estaba en z = −0.05 y se veía **a la mitad del brazo**. Las **herramientas** se agarran por el mango: `ITEMS[id].agarre` es el píxel del sprite donde va la mano, y `makeItemGeometry(id, true)` mueve el origen de la malla a ese punto (solo para la mano: en el suelo giran sobre su centro). Así el extremo del mango queda en la mano y la cabeza apunta hacia arriba.
+- **El grupo de la mano se gira** (`handGroup.rotation` en `updateHand`, para que el brazo se vea en diagonal). Un objeto plano tiene que deshacer ese giro para mirar al jugador: se usa `rotation.order = 'ZYX'` con los ángulos opuestos, que es la inversa exacta del giro XYZ del grupo, más un pequeño giro para que no quede de frente. Si se cambia `handGroup.rotation`, hay que revisar también esto.
+- `hand.mesh` es la malla que se sostiene (lo usan las pruebas).
+- **Para ver cómo queda:** `npm run captura` (ver "Capturas" más abajo).
 
 ### Salud (`salud.js`)
 
@@ -198,11 +235,11 @@ Sin `window.guardado` (por ejemplo, en un navegador) no hay menú ni guardado y 
 
 ### El estado guardado
 
-`guardarPartida()` arma: `version` (1), `nombre`, `semilla`, `hora`, `creativo`, `seleccionado`, `inventario` (36 casillas `{id, count}` o `null`), `vida`, `hambre`, `saturacion`, `spawn`, `jugador` (`x, y, z, yaw, pitch, vuela`) y `chunks` (lista de `{cx, cz, maxY, data}`, con solo los modificados).
+`guardarPartida()` arma: `version` (1), `nombre`, `semilla`, `hora`, `creativo`, `seleccionado`, `itemsV` (2), `inventario` (36 casillas `{id, count, dano}` o `null`; `dano` solo si la herramienta tiene desgaste), `vida`, `hambre`, `saturacion`, `spawn`, `jugador` (`x, y, z, yaw, pitch, vuela`) y `chunks` (lista de `{cx, cz, maxY, data}`, con solo los modificados).
 
 - **En disco:** JSON comprimido con gzip; cada `data` (16384 bytes por chunk) va en base64. La conversión la hace `guardado-main.js`, así la página maneja `Uint8Array` directamente.
 - **Cargar:** en `game.js`, `cargarPartida()` se llama **antes de generar chunks**, porque cambia la semilla, rellena `savedChunks` y deja al jugador donde estaba. Si no hay partida, la semilla sale de `&semilla=` y el jugador aparece en `buscarSpawn()`.
-- **Compatibilidad hacia atrás:** los campos de salud, `spawn` y `nombre` son opcionales. Una partida sin ellos arranca con vida y hambre llenas. Si se cerró el juego en la pantalla de muerte (`vida` 0), se reaparece en el inicio. **Agregar campos opcionales no obliga a subir `VERSION`.**
+- **Compatibilidad hacia atrás:** los campos de salud, `spawn` y `nombre` son opcionales. Una partida sin ellos arranca con vida y hambre llenas. Si se cerró el juego en la pantalla de muerte (`vida` 0), se reaparece en el inicio. **Agregar campos opcionales no obliga a subir `VERSION`.** Lo mismo con `itemsV`: una partida sin esa marca viene de antes de los objetos nuevos, cuando la manzana era el id 11 (hoy la mesa de crafteo); al cargarla, `cargarPartida` cambia ese id por `ID.MANZANA` (100) en el inventario.
 - **Cuándo se guarda:** cada 30 segundos, al cerrar la ventana (`main.js` pide guardar y espera `mundo:guardado-listo`, con un tope de 3 segundos; el menú responde enseguida porque no tiene nada que guardar), al volver al menú y una vez al crear un mundo (para que aparezca en la lista desde el primer momento).
 - **Escritura atómica:** se escribe `mundo.json.gz.tmp` y se renombra.
 - **Respaldo:** al cargar bien el archivo principal se copia a `mundo.respaldo.json.gz`. Si el principal está dañado se usa el respaldo, y este no se pisa. Si ninguno sirve, se empieza un mundo nuevo.
@@ -238,6 +275,12 @@ En cada frame, en este orden:
 
 `window.mc` (al final de `game.js`) expone `CONFIG`, `player`, `chunks`, `inventory`, `getBlock`, `setBlock`, `setTime`, `applyQuality` y más. Sirve para probar cosas con F12 sin recompilar (ejemplo: `mc.setTime(0.25)`).
 
+## Capturas: cómo ver lo que dibuja el juego
+
+`npm run captura` abre el juego en Electron sin ventana, arma cada escena y guarda un PNG en `capturas/` (carpeta ignorada por git). `npm run captura -- mano-bloque,suelo` saca solo algunas. Escenas: `mano-bloque`, `mano-piedra`, `mano-manzana`, `mano-vacia`, `suelo`, `inventario`, `barra`, `pantalla`. Para agregar una, sumarla a `ESCENAS` en `test/captura.js`.
+
+**Para qué:** `npm test` comprueba que las cosas existen y funcionan, pero no puede decir si **se ven bien**. Después de cambiar algo visual (modelos, texturas, la mano, la interfaz), sacá la captura y mirala (con la herramienta de leer archivos, que muestra la imagen) antes de decir que quedó bien. El bloque a mitad del brazo y la manzana cúbica pasaron inadvertidos hasta que se miró una captura.
+
 ## Cómo pedirle cambios a la IA con esta estructura
 
 El README original dice que la estructura está "pensada para pedirle cambios archivo por archivo". Mapa rápido de **a qué archivo ir según lo que quieras**:
@@ -246,6 +289,9 @@ El README original dice que la estructura está "pensada para pedirle cambios ar
 |---|---|
 | Un número (velocidad, distancia, altura de nubes) | `config.js` |
 | Un bloque nuevo o sus propiedades | `config.js` + `textures.js` |
+| Un objeto nuevo que no es bloque (como la manzana o una herramienta) | `config.js` (`ITEMS` e `ID`) + un sprite en `textures.js` |
+| Una receta de crafteo nueva | `objetos.js` (`RECETAS`) |
+| El crafteo, las herramientas, el desgaste o el catálogo creativo | `inventory.js` (pantalla y lógica), `objetos.js` (reglas) y `index.html` (estilos) |
 | Cómo se ve una textura | `textures.js` |
 | Cómo es el terreno, árboles, cuevas | `world.js` (`heightAt`, `generateChunk`) |
 | Cielo, luz, hora | `sky.js` |
@@ -266,8 +312,10 @@ Leídos del código; no son bugs confirmados, sino lugares donde un cambio puede
 - **Dependencias circulares:** hoy no hay y las reglas de arriba las evitan. Si un archivo "de abajo" necesita algo de uno "de arriba", la solución es pasarlo por parámetro o mover código, no importar en círculo.
 - **Reasignar lo importado** (`daylight = …` desde otro archivo) da error en el navegador. Usar un objeto o una función, como `shadow.dirty`.
 - **`OPAQUE` en `world.js`** se arma con un bucle fijo de ids 1 a 9. Un bloque nuevo con id distinto necesita ajustarlo.
-- **`NTILES = 12` y el atlas** son números sueltos que deben coincidir con las texturas dibujadas.
-- **El id 11 (manzana) no es un bloque del mundo**: nunca debería terminar en `chunks`. Cualquier objeto nuevo con `food` o similar tiene que pasar por `placeBlock` antes de poder ponerse.
+- **`NTILES = 13` y el atlas** son números sueltos que deben coincidir con las texturas dibujadas (11 de bloques más 2 de la mesa de crafteo). Los objetos planos no usan el atlas.
+- **Los ids de objetos (100 en adelante) nunca deben terminar en `chunks`** (el mundo guarda un byte por bloque y `BLOCKS[100]` no existe). Por eso `placeBlock` descarta todo lo que está en `ITEMS` antes de poner nada.
+- **Cambiar un id guardado rompe las partidas.** Las manzanas eran el 11 y pasaron al 100 cuando el 11 se volvió la mesa de crafteo; se resolvió con la marca `itemsV` en el guardado (ver abajo). Si hay que mover otro id, hace falta una migración igual.
+- **Las herramientas no se apilan** (`maxPila` = 1). Cualquier código nuevo que cree o mueva pilas tiene que pasar por `nuevaPila`/`invAdd`/`moveInto` para no perder el campo `dano`.
 - **Los teletransportes** (un cambio de posición de más de 2 bloques en un paso) reinician el conteo de caída. Si agregás una forma de moverse mucho en un paso, tené en cuenta que no cuenta como caída.
 - **Todo corre en un solo hilo.** Cualquier trabajo pesado nuevo (más generación, mobs, guardado) puede notarse en los FPS.
 - **Las pruebas (`npm test`) no ven el aspecto ni el mouse real.** Detalle y límites en [06-checklist-pruebas.md](06-checklist-pruebas.md#pruebas-automáticas-npm-test).

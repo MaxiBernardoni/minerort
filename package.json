@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "electron test/run.js"
+    "test": "electron test/run.js",
+    "captura": "electron test/captura.js"
   },
   "dependencies": {
     "three": "0.149.0"

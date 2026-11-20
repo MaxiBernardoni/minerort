@@ -5,9 +5,9 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { BLOCKS } from './config.js';
+import { BLOCKS, ID } from './config.js';
 
-const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 12;
+const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 13;
 
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = NTILES * CELL;
@@ -168,14 +168,103 @@ paint(10, (x, y) => {                                                           
   if (w.f2 - w.f1 < 0.1) g *= 0.5;
   return [g, g, g + 4];
 });
-paint(11, (x, y) => {                                                             // manzana (se ve como un cubo rojo hasta tener objetos planos)
-  let c = lerpC([150, 20, 22], [214, 48, 40], 1 - Math.min(1, Math.hypot(x - 15.5, y - 17) / 22));
-  c = mulC(c, 0.92 + rnd(x, y, 110) * 0.14);
-  if (Math.hypot(x - 10, y - 11) < 4) c = lerpC(c, [255, 190, 180], 0.55);        // brillo
-  if (x >= 15 && x <= 16 && y < 7) c = [80, 50, 25];                              // tallo
-  if (x >= 17 && x <= 21 && y >= 3 && y <= 5) c = [60, 140, 40];                  // hoja
-  return c;
+const tablon = (x, y) => mulC(lerpC([150, 110, 66], [190, 148, 92], rnd(y >> 3, 0, 81)), 0.92 + rnd(x, y, 120) * 0.14);   // color de madera de la mesa
+paint(11, (x, y) => {                                                             // mesa de crafteo (arriba): marco y cuadricula de 3x3
+  if (Math.min(x, y, TILE - 1 - x, TILE - 1 - y) < 3) return mulC(lerpC(BARK_DARK, [110, 78, 44], rnd(x, y, 121)), 0.95);
+  const linea = x >= 4 && x <= 28 && y >= 4 && y <= 28 && ((x - 4) % 8 === 0 || (y - 4) % 8 === 0);
+  return linea ? [70, 48, 28] : mulC(tablon(x, y), 0.82);
 });
+paint(12, (x, y) => {                                                             // mesa de crafteo (lados): tablones con una herramienta dibujada
+  if (y < 5) return mulC(lerpC(BARK_DARK, [110, 78, 44], rnd(x, y, 122)), 0.95);   // el marco de arriba
+  if (Math.abs((x - 6) - (26 - y) * 0.62) < 1.3 && y >= 10 && y <= 26) return [90, 62, 34];      // mango
+  if (y >= 8 && y <= 11 && x >= 11 && x <= 24) return [128, 128, 132];                           // cabeza
+  return tablon(x, y);
+});
+
+// ---------- sprites de objetos (los que NO son bloques: se dibujan planos, de 16x16) ----------
+// Una letra por pixel, '.' = transparente. effects.js los convierte en un objeto plano con espesor.
+const itemSprites = {};
+function paintSprite(id, filas, paleta) {
+  const N = 16, c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d');
+  filas.forEach((fila, y) => [...fila.padEnd(N, '.')].forEach((ch, x) => {
+    if (ch === '.') return;
+    g.fillStyle = paleta[ch];
+    g.fillRect(x, y, 1, 1);
+  }));
+  itemSprites[id] = c;
+}
+paintSprite(ID.MANZANA, [                                                         // manzana
+  '................',
+  '.......sd..gg...',
+  '.......s..gggg..',
+  '....ooo.s.ggG...',
+  '..oorrrorrrro...',
+  '.orrhhrrrrrrro..',
+  '.orhhrrrrrrrro..',
+  'orrhrrrrrrrrrro.',
+  'orrrrrrrrrrrrro.',
+  'orrrrrrrrrrrrdo.',
+  'orrrrrrrrrrrddo.',
+  '.orrrrrrrrrdddo.',
+  '.orrrrrrrrrddo..',
+  '..oorrrrrrrroo..',
+  '...ooorroooo....',
+], { o: '#6e0f12', r: '#cf2a2a', h: '#ff9c9c', d: '#962024', s: '#5a3a1e', g: '#54ad3b', G: '#2e7a24' });
+
+// Palo y herramientas: se arman con pixeles sueltos y se les dibuja un contorno oscuro (como los de Minecraft)
+function spriteDePixeles(id, pixeles) {
+  const N = 16, c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d');
+  const color = (x, y) => pixeles[x + ',' + y];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const col = color(x, y);
+    if (col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); }
+    else if (color(x - 1, y) || color(x + 1, y) || color(x, y - 1) || color(x, y + 1)) { g.fillStyle = '#1e140a'; g.fillRect(x, y, 1, 1); }
+  }
+  itemSprites[id] = c;
+}
+const MANGO = '#7a5428';
+// Cabezas (pixeles x,y de la grilla de 16x16): 'principal' es el color del material y 'claro' el brillo
+const CABEZAS = {
+  pico: {
+    principal: [[4, 4], [5, 3], [6, 2], [7, 2], [8, 2], [9, 2], [10, 2], [11, 2], [12, 3], [13, 4], [13, 5], [13, 6]],
+    claro: [[5, 4], [6, 3], [7, 3], [8, 3], [9, 3], [10, 3], [11, 3], [12, 4], [12, 5]],
+  },
+  // el hacha: una hoja que se abre hacia abajo y a la derecha del extremo del mango; el filo (lo mas lejos) es la parte clara
+  hacha: {
+    principal: [[9, 2], [10, 2], [11, 2], [9, 3], [10, 3], [11, 3], [12, 3], [10, 4], [11, 4], [12, 4], [13, 4], [11, 5], [12, 5], [13, 5], [14, 5], [12, 6], [13, 6], [14, 6], [13, 7]],
+    claro: [[13, 4], [14, 5], [14, 6], [13, 7]],
+  },
+  pala: ovalo(),
+};
+// la pala: una paleta ovalada, alargada en la direccion del mango (hacia arriba y a la derecha)
+function ovalo() {
+  const principal = [], claro = [];
+  for (let y = 0; y < 8; y++) for (let x = 8; x < 16; x++) {
+    const u = ((x - 12) - (y - 3)) / Math.SQRT2, v = ((x - 12) + (y - 3)) / Math.SQRT2;   // u: a lo largo del mango, v: de costado
+    if ((u / 3.4) ** 2 + (v / 2.1) ** 2 <= 1) (v < -0.4 ? claro : principal).push([x, y]);
+  }
+  return { principal, claro };
+}
+const MATERIALES = { madera: { principal: '#a67c45', claro: '#cfa66a' }, piedra: { principal: '#7e7e7e', claro: '#b4b4b4' } };
+function herramienta(id, tipo, material) {
+  const p = {}, m = MATERIALES[material], cab = CABEZAS[tipo];
+  for (let i = 0; i < 10; i++) p[(2 + i) + ',' + (13 - i)] = MANGO;                // el mango, en diagonal
+  cab.principal.forEach(([x, y]) => { p[x + ',' + y] = m.principal; });
+  cab.claro.forEach(([x, y]) => { p[x + ',' + y] = m.claro; });
+  spriteDePixeles(id, p);
+}
+{
+  const palo = {};
+  for (let i = 0; i < 11; i++) palo[(2 + i) + ',' + (14 - i)] = MANGO;
+  spriteDePixeles(ID.PALO, palo);
+}
+herramienta(ID.PICO_MADERA, 'pico', 'madera');   herramienta(ID.PICO_PIEDRA, 'pico', 'piedra');
+herramienta(ID.HACHA_MADERA, 'hacha', 'madera'); herramienta(ID.HACHA_PIEDRA, 'hacha', 'piedra');
+herramienta(ID.PALA_MADERA, 'pala', 'madera');   herramienta(ID.PALA_PIEDRA, 'pala', 'piedra');
 
 const atlasTexture = new THREE.CanvasTexture(atlasCanvas);
 atlasTexture.magFilter = THREE.NearestFilter;
@@ -225,11 +314,16 @@ for (let s = 0; s < 10; s++) {
   crackTextures.push(t);
 }
 
-// ---------- icono 3D (cubo isometrico) para la barra ----------
+// ---------- icono para la barra y el inventario: cubo isometrico para los bloques, el sprite plano para los objetos ----------
 function makeBlockIcon(id) {
   const S = 64, T = TILE, c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d');
+  if (itemSprites[id]) {                                    // objeto plano: se ve el dibujo, no un cubo
+    g.imageSmoothingEnabled = false;                        // pixeles nitidos
+    g.drawImage(itemSprites[id], 8, 8, 48, 48);
+    return c;
+  }
   g.imageSmoothingEnabled = true;
   const [top, , side] = BLOCKS[id].tiles;
   g.setTransform(28 / T, 14 / T, -28 / T, 14 / T, 32, 4);  g.drawImage(tileCanvases[top], 0, 0);
@@ -242,4 +336,4 @@ function makeBlockIcon(id) {
   return c;
 }
 
-export { hash2, lerp, smooth, tn, tileUV, tileAvg, atlasTexture, waterTexture, crackTextures, makeBlockIcon };
+export { hash2, lerp, smooth, tn, tileUV, tileAvg, atlasTexture, waterTexture, crackTextures, itemSprites, makeBlockIcon };

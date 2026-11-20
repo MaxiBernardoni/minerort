@@ -3,8 +3,8 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { CONFIG, BLOCKS, isSolidB } from './config.js';
-import { hash2, tileUV, tileAvg, atlasTexture, crackTextures } from './textures.js';
+import { CONFIG, BLOCKS, ITEMS, isSolidB } from './config.js';
+import { hash2, tileUV, tileAvg, atlasTexture, crackTextures, itemSprites } from './textures.js';
 import { scene, handScene } from './scene.js';
 import { getBlock, FACES, QUV } from './world.js';
 import { daylight } from './sky.js';
@@ -81,6 +81,57 @@ const handGroup = new THREE.Group();
 handScene.add(handGroup);
 let handMesh = null;
 
+// ---------- Objetos planos (los que no son bloques, como la manzana) ----------
+// Se dibujan como en Minecraft: el sprite de 16x16 con espesor, un voxel por pixel opaco. Hay que usar esto (no
+// makeBlockGeometry) para todo id que este en ITEMS: mano, objetos en el suelo.
+const esItem = id => !!ITEMS[id];                           // objetos (config.js ITEMS): planos; los bloques son cubos
+
+// enMano = true: el origen de la malla queda en el punto de agarre (ITEMS[id].agarre), asi la mano sostiene la herramienta por el mango
+function makeItemGeometry(id, enMano = false) {
+  const sprite = itemSprites[id], N = sprite.width;
+  const datos = sprite.getContext('2d').getImageData(0, 0, N, N).data;
+  const opaco = (x, y) => x >= 0 && y >= 0 && x < N && y < N && datos[(y * N + x) * 4 + 3] > 127;
+  const pos = [], uv = [], col = [], ind = [];
+  const T = 1 / N;                                          // medio espesor: 2 pixeles de grosor en total
+  const quad = (vertices, u, brillo) => {                   // vertices en sentido antihorario visto desde afuera
+    const b = pos.length / 3;
+    for (const v of vertices) { pos.push(...v); uv.push(u[0], u[1]); col.push(brillo, brillo, brillo); }
+    ind.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    if (!opaco(x, y)) continue;
+    const x0 = -0.5 + x / N, x1 = x0 + 1 / N, y1 = 0.5 - y / N, y0 = y1 - 1 / N;
+    const u = [(x + 0.5) / N, 1 - (y + 0.5) / N];           // todas las caras del voxel toman el color de su pixel
+    quad([[x0, y0, T], [x1, y0, T], [x1, y1, T], [x0, y1, T]], u, 1);              // frente
+    quad([[x1, y0, -T], [x0, y0, -T], [x0, y1, -T], [x1, y1, -T]], u, 0.85);       // atras
+    if (!opaco(x - 1, y)) quad([[x0, y0, -T], [x0, y0, T], [x0, y1, T], [x0, y1, -T]], u, 0.7);    // lado izquierdo
+    if (!opaco(x + 1, y)) quad([[x1, y0, T], [x1, y0, -T], [x1, y1, -T], [x1, y1, T]], u, 0.7);    // lado derecho
+    if (!opaco(x, y - 1)) quad([[x0, y1, T], [x1, y1, T], [x1, y1, -T], [x0, y1, -T]], u, 0.9);    // arriba
+    if (!opaco(x, y + 1)) quad([[x0, y0, -T], [x1, y0, -T], [x1, y0, T], [x0, y0, T]], u, 0.6);    // abajo
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(ind);
+  const agarre = enMano && ITEMS[id].agarre;
+  if (agarre) g.translate(-(-0.5 + (agarre[0] + 0.5) / N), -(0.5 - (agarre[1] + 0.5) / N), 0);
+  return g;
+}
+
+// Un material por objeto (la textura es su sprite). Se comparte entre la mano y los objetos del suelo;
+// updateHand le pone la luz del dia a todos.
+const itemMaterials = {};
+function itemMaterial(id) {
+  if (!itemMaterials[id]) {
+    const t = new THREE.CanvasTexture(itemSprites[id]);
+    t.magFilter = t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    itemMaterials[id] = new THREE.MeshBasicMaterial({ map: t, vertexColors: true, alphaTest: 0.5 });
+  }
+  return itemMaterials[id];
+}
+
 function makeBlockGeometry(id) {
   const pos = [], col = [], uv = [], ind = [];
   FACES.forEach((F, fi) => {
@@ -130,15 +181,30 @@ const armMesh = new THREE.Mesh(
 );
 handGroup.add(armMesh);
 
-const hand = { swing: -1, mining: false, equip: 1, bobT: 0, bob: 0 };
+const HAND_TIP_Z = -0.15;                // donde termina el brazo (la mano): la caja del brazo mide 0.8 y esta corrida 0.25
+const hand = { swing: -1, mining: false, equip: 1, bobT: 0, bob: 0, mesh: null };   // mesh = lo que se sostiene (para las pruebas)
 function setHandBlock(id) {
   if (handMesh) { handGroup.remove(handMesh); handMesh.geometry.dispose(); handMesh = null; }
+  hand.mesh = null;
   hand.equip = 0;                        // animacion de "sacar" el objeto
   if (!id) return;                       // mano vacia: solo se ve el brazo
-  handMesh = new THREE.Mesh(makeBlockGeometry(id), handMaterial);
-  handMesh.scale.setScalar(0.1);
-  handMesh.position.set(0, 0.075, -0.05);
-  handMesh.rotation.y = 0.75;
+  if (esItem(id)) {                      // objeto plano: de pie, en la punta de la mano y un poco girado
+    const herramienta = !!ITEMS[id].agarre;                        // las herramientas se agarran por el mango y se ven un poco mas grandes
+    handMesh = new THREE.Mesh(makeItemGeometry(id, true), itemMaterial(id));
+    handMesh.scale.setScalar(herramienta ? 0.26 : 0.2);
+    if (herramienta) handMesh.position.set(0, 0.03, HAND_TIP_Z - 0.01);   // el punto de agarre queda en la punta de la mano
+    else handMesh.position.set(0, 0.06, HAND_TIP_Z - 0.03);
+    // El brazo esta girado (handGroup.rotation en updateHand): se deshace ese giro para que el sprite mire al jugador.
+    // El orden ZYX hace que sea justo la inversa del giro del grupo (que es XYZ). Despues, un pequeño giro para que no quede de frente.
+    handMesh.rotation.order = 'ZYX';
+    handMesh.rotation.set(-0.55, -0.5 + 0.3, 0);
+  } else {                               // bloque: un cubo en la punta de la mano (antes quedaba a la mitad del brazo)
+    handMesh = new THREE.Mesh(makeBlockGeometry(id), handMaterial);
+    handMesh.scale.setScalar(0.1);
+    handMesh.position.set(0, 0.02, HAND_TIP_Z - 0.01);
+    handMesh.rotation.y = 0.75;
+  }
+  hand.mesh = handMesh;
   handGroup.add(handMesh);
 }
 function startSwing() { if (hand.swing < 0) hand.swing = 0; }
@@ -147,6 +213,7 @@ function updateHand(dt, speedXZ, onGround) {
   const light = Math.max(0.4, daylight);
   handMaterial.color.setScalar(light);
   armMaterial.color.setScalar(light);
+  for (const m of Object.values(itemMaterials)) m.color.setScalar(light);         // objetos planos (mano y suelo)
   if (hand.mining) startSwing();
   if (hand.swing >= 0) {
     hand.swing += dt / 0.32;
@@ -169,4 +236,4 @@ function updateHand(dt, speedXZ, onGround) {
   handGroup.scale.setScalar(1);
 }
 
-export { spawnBreakParticles, updateParticles, crackMesh, setCrackStage, hand, setHandBlock, startSwing, updateHand, makeBlockGeometry, pixelBox, SKIN, SHIRT };
+export { spawnBreakParticles, updateParticles, crackMesh, setCrackStage, hand, setHandBlock, startSwing, updateHand, makeBlockGeometry, esItem, makeItemGeometry, itemMaterial, HAND_TIP_Z, pixelBox, SKIN, SHIRT };
