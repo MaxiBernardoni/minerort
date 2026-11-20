@@ -1,6 +1,6 @@
 # 03 · Arquitectura
 
-> Última revisión: 2026-11-20 · Corresponde al código después de completar la Fase 2 (objetos, crafteo y herramientas). Hay cambios sin commitear desde `d83d997`.
+> Última revisión: 2026-11-20 · Corresponde al código después de completar la Fase 4 (mobs y combate; antes, la Fase 3: cuevas, minerales, biomas, agua que fluye y cabañas). Hay cambios sin commitear desde `76eb7fd` (la Fase 2).
 > Este documento está pensado para dárselo a una IA al empezar una sesión. Los nombres de archivos y funciones salen del código real.
 
 ## Vista general
@@ -38,6 +38,9 @@ Cada flecha es un `import`. De abajo (base) hacia arriba:
 
 ```
 game.js ─▶ todos los de abajo
+agua.js ─▶ world, config
+mobs.js ─▶ fisica, salud, inventory, effects, sky, world, scene, player, textures, config
+fisica.js ─▶ world, config
 guardado.js ─▶ inventory, sky, world, player, config
 salud.js ─▶ inventory, player, config
 menu.js ─▶ (nada: solo usa window.guardado y el HTML)
@@ -56,12 +59,15 @@ config.js ─▶ (nada)
 
 | Archivo | Exporta | Importa de |
 |---|---|---|
-| `config.js` | `CONFIG`, `QUALITY`, `ID`, `BLOCKS`, `ITEMS`, `itemInfo`, `CS`, `H`, `WATER`, `LEAVES`, `ITEM_IDS`, `isSolidB`, `isOpaque` | — |
+| `config.js` | `CONFIG`, `QUALITY`, `ID`, `BLOCKS`, `ITEMS`, `itemInfo`, `CS`, `H`, `WATER`, `LEAVES`, `ITEM_IDS`, `isSolidB`, `isOpaque`, `isWater`, `nivelAgua`, `alturaAgua` | — |
+| `agua.js` | `tickAgua`, `pasoAgua` | `world`, `config` |
+| `fisica.js` | `colisiona`, `moverEje` | `world`, `config` |
+| `mobs.js` | `mobs`, `TIPOS`, `spawnMob`, `actualizarMobs`, `apuntarMob`, `golpear`, `quitar` | `fisica`, `salud`, `inventory`, `effects`, `sky`, `world`, `scene`, `player`, `textures`, `config` |
 | `objetos.js` | `maxPila`, `RECETAS`, `buscarReceta`, `velocidadDeMinado`, `puedeRecoger`, `esHerramienta`, `MAX_PILA` | `config` |
 | `textures.js` | `atlasTexture`, `waterTexture`, `crackTextures`, `itemSprites`, `tileUV`, `tileAvg`, `makeBlockIcon`, `hash2`, `tn`, `smooth`, `lerp` | `config` |
 | `scene.js` | `canvas`, `renderer`, `scene`, `camera`, `handScene`, `handCamera`, `sun`, `hemi`, `shadow`, `fogFar()`, `applyRenderScale`, `renderScale` | `config` |
 | `player.js` | `player` (posición, velocidad y también vida, hambre, punto de aparición…), `mouse`, `lookDir` | — |
-| `world.js` | `chunks`, `savedChunks`, `chunkKey`, `heightAt`, `getBlock`, `setBlock`, `updateChunks`, `resetLoadRadius`, `FACES`, `QUV`, `waterMaterial`, `windUniform` | `config`, `textures`, `scene` |
+| `world.js` | `chunks`, `savedChunks`, `chunkKey`, `generateChunk`, `heightAt`, `biomeAt`, `BIOMA`, `BIOMA_NOMBRE`, `esCueva`, `cabanaEn`, `getBlock`, `setBlock`, `rehacerMallas`, `activeWater`, `waterKey`, `chunkLoaded`, `updateChunks`, `resetLoadRadius`, `FACES`, `QUV`, `waterMaterial`, `windUniform` | `config`, `textures`, `scene` |
 | `quality.js` | `applyQuality` | `config`, `scene`, `world` |
 | `sky.js` | `skyMesh`, `updateSky`, `daylight`, `setTime`, `skipTime`, `clockString` | `config`, `textures`, `scene`, `world` |
 | `effects.js` | `hand`, `setHandBlock`, `updateHand`, `startSwing`, `makeBlockGeometry`, `esItem`, `makeItemGeometry`, `itemMaterial`, `HAND_TIP_Z`, `pixelBox`, `SKIN`, `SHIRT`, partículas y grietas | `config`, `textures`, `scene`, `world`, `sky` |
@@ -76,24 +82,27 @@ config.js ─▶ (nada)
 
 | Archivo | Líneas | Responsabilidad |
 |---|---|---|
-| `src/config.js` | 120 | Valores ajustables y definición de bloques (`BLOCKS`) y objetos (`ITEMS`) (ver abajo). |
-| `src/objetos.js` | 76 | Las recetas de crafteo y las reglas de las herramientas (velocidad, qué suelta cada bloque, cuántos caben por casilla). Funciones puras. |
-| `src/textures.js` | 339 | Dibuja todas las texturas con canvas 2D: ruido tileable, ruido celular. Arma un atlas de 13 tiles (los bloques) y los sprites planos de los objetos (manzana, palo, herramientas). |
+| `src/config.js` | 155 | Valores ajustables y definición de bloques (`BLOCKS`) y objetos (`ITEMS`) (ver abajo). |
+| `src/objetos.js` | 80 | Las recetas de crafteo y las reglas de las herramientas (velocidad, qué suelta cada bloque, cuántos caben por casilla). Funciones puras. |
+| `src/textures.js` | 449 | Dibuja todas las texturas con canvas 2D: ruido tileable, ruido celular. Arma un atlas de 20 tiles (los bloques) y los sprites planos de los objetos (manzana, palo, herramientas, lingote, diamante). |
 | `src/scene.js` | 63 | Renderer WebGL, cámaras, luz del sol/luna con sombras, resolución adaptativa. |
 | `src/quality.js` | 34 | Presets de calidad (alta/media/baja) aplicados en caliente con la tecla K. |
 | `src/player.js` | 25 | Estado compartido del jugador (incluida la salud) y del mouse, y hacia dónde mira. |
 | `src/salud.js` | 161 | Vida, hambre, daño por caída, muerte y reaparición, y la barra de corazones y muslos. |
 | `src/menu.js` | 82 | Menú principal: lista, crea y borra mundos. |
-| `src/world.js` | 391 | Terreno, chunks, árboles, acceso a bloques, generación de mallas, carga/descarga. |
+| `src/agua.js` | 72 | El agua que fluye: cada celda activa mira a sus vecinos y toma su nivel (ver "Agua que fluye"). |
+| `src/fisica.js` | 38 | El choque de una caja contra los bloques (`colisiona`, `moverEje`). Lo usan el jugador y los mobs. |
+| `src/mobs.js` | 292 | Cerdo, vaca y zombi: modelos (cajas con color por vértice, unidas), IA, aparición cerca del jugador, y el combate (rayo contra las cajas, daño, empujón, botín). |
+| `src/world.js` | 550 | Biomas, cuevas, minerales, cabañas, árboles, chunks, acceso a bloques, generación de mallas (con la luz del cielo) y carga/descarga. |
 | `src/sky.js` | 165 | Domo de cielo con shader, nubes, ciclo día/noche, la luz y la cámara de sombras. |
 | `src/effects.js` | 239 | Partículas, grietas al romper, mano animada, y el modelo de los objetos planos. |
 | `src/character.js` | 94 | Cuerpo del jugador visible en tercera persona. |
 | `src/inventory.js` | 500 | Datos y UI del inventario, crafteo (grillas de 2×2 y 3×3), desgaste de herramientas, catálogo creativo y objetos soltados en el mundo. |
 | `src/guardado.js` | 110 | Arma y aplica el estado de la partida (qué se guarda), el mundo elegido por la dirección, el autoguardado y el botón "Guardar y volver al menú". |
-| `src/game.js` | 394 | Entrada del juego: física del jugador (incluida la caída), raycast, controles, minado/colocación/comer, bucle `frame()`, arranque (muestra el menú o carga el mundo antes de generarlo). |
+| `src/game.js` | 395 | Entrada del juego: física del jugador (incluida la caída), raycast, controles, minado/colocación/comer, pegarle a los mobs, bucle `frame()`, arranque (muestra el menú o carga el mundo antes de generarlo). |
 | `test/run.js` | 152 | `npm test`: abre el juego en Electron sin ventana, corre las pruebas (también reiniciando el juego, creando y borrando mundos) y devuelve código 0 o 1. Usa una carpeta temporal. No es parte del juego. |
-| `test/pruebas.js` | 630 | Las pruebas del juego en marcha, que se ejecutan dentro de la página. |
-| `test/captura.js` | 106 | `npm run captura`: saca capturas del juego (mano, suelo, inventario, crafteo, mesa, barra, sprites ampliados) para poder mirarlas. No es parte del juego. |
+| `test/pruebas.js` | 1047 | Las pruebas del juego en marcha, que se ejecutan dentro de la página. |
+| `test/captura.js` | 196 | `npm run captura`: saca capturas del juego (mano, suelo, inventario, crafteo, mesa, barra, sprites ampliados, bloques nuevos, agua, una cueva, una cabaña, un paisaje de cada bioma y los mobs) para poder mirarlas. No es parte del juego. |
 | `test/pruebas-reinicio.js` | 73 | Las pruebas que se ejecutan después de reiniciar el juego (¿volvió la partida?). |
 | `test/pruebas-menu.js` | 140 | Las pruebas del menú principal, los varios mundos y la migración. |
 
@@ -103,8 +112,8 @@ config.js ─▶ (nada)
 
 Hay **dos registros**, y un mismo id numérico nunca está en los dos:
 
-- **`BLOCKS`: lo que existe en el mundo.** Ids del **1 al 99** (hoy 1–11; el 10 es el agua; el 11 es la mesa de crafteo; 0 es aire).
-- **`ITEMS`: lo que NO es un bloque** (no se pone en el mundo). Ids desde el **100**: manzana (100), palo (101) y pico, hacha y pala de madera (102, 104, 106) y de piedra (103, 105, 107).
+- **`BLOCKS`: lo que existe en el mundo.** Ids del **1 al 99** (hoy 1–16 y 20–26; el 10 es la **fuente** de agua; el 11 es la mesa de crafteo; 12 mineral de hierro, 13 mineral de diamante, 14 nieve, 15 cactus, 16 abedul; **20 a 26 son el agua que fluye** (niveles 1 a 7); 0 es aire). Los 7 ids del agua que fluye se generan con un bucle, y `ITEM_IDS` (inventario y catálogo creativo) no los incluye. Usar `isWater(b)`, no `b === WATER`.
+- **`ITEMS`: lo que NO es un bloque** (no se pone en el mundo). Ids desde el **100**: manzana (100), palo (101), pico, hacha y pala de madera (102, 104, 106) y de piedra (103, 105, 107), **lingote de hierro (108), diamante (109)**, y pico, hacha y pala **de hierro (110, 112, 114) y de diamante (111, 113, 115)**. Cada herramienta tiene `nivel` (madera 0, piedra 1, hierro 2, diamante 3); un bloque con `nivel` (los minerales) solo suelta algo con una herramienta de ese nivel o mejor.
 - `ID` da nombres a los ids más usados (`ID.MESA`, `ID.PALO`, `ID.PICO_PIEDRA`…): usarlos en vez de números sueltos. `itemInfo(id)` devuelve los datos de un id sea bloque u objeto (nombre, etc.). Un bloque también puede estar en el inventario con su mismo id.
 
 ```js
@@ -164,6 +173,12 @@ Todo puro (sin pantalla): se prueba solo.
 - `heightAt(x, z)`: mezcla dos capas de ruido de valor (`fbm`) para dar una altura entera por columna.
 - `generateChunk`: rellena capas (césped/tierra/piedra o arena), agua hasta `seaLevel`, y planta árboles. Los árboles miran las columnas vecinas (±2) para que las copas crucen bordes de chunk de forma consistente.
 - Todo sale de `hash2` con la semilla: **mismo seed = mismo mundo**.
+- `biomeAt(x, z)`: dos ruidos de muy baja frecuencia (temperatura y humedad) dan **llanura, bosque, desierto o nevado**. No cambia las alturas, solo qué bloque va arriba (`generateChunk`) y qué árboles hay (`K_ARBOL` es la frecuencia relativa de cada bioma, multiplicada por `CONFIG.treeChance`).
+- **Cuevas:** `esCueva(x, y, z)` es verdadero donde dos ruidos 3D (`noise3`) están a menos de `CUEVA_ANCHO` de 0,5 a la vez (un tubo). Solo se vacían celdas de `y = 3` hasta `h - 4`: el techo de 4 bloques protege el fondo de los lagos. Los **sumideros** (`esSumidero`: ruido 2D alto) bajan hasta 12 bloques hasta el primer túnel, y los árboles no crecen en esas columnas.
+- **Minerales:** después de las cuevas, `veta()` camina al azar unos pasos desde un punto elegido con un generador (`azar`) sembrado con `hash2(cx, cz, seed + 5000)`, así que **cada chunk siempre da las mismas vetas**. Solo reemplaza piedra (id 3) y se corta en el borde del chunk (una veta no cruza al vecino).
+- **Árboles por bioma:** roble (4–5 de alto), roble grande (6–7, copa de radio 3, solo en el bosque), abedul (tronco `ID.ABEDUL`), pino (nevado y sobre la altura 47: cono de hojas) y cactus (desierto). La función `capa` pone una capa cuadrada de hojas con o sin esquinas.
+- **Cabañas:** `cabanaEn(gx, gz)` decide, para una celda de 48×48, si hay una y dónde (con `hash2`, sin guardar nada). Cada chunk revisa las celdas que lo tocan y escribe la parte de la cabaña que cae adentro, igual que los árboles, así que las cabañas cruzan bordes de chunk sin costuras.
+- **Si cambiás el generador:** las pruebas `cuevas`, `minerales`, `biomas` y `estructuras` miran porcentajes y reglas (no bloques exactos); la de "terreno estable" mira las alturas (que no cambian con los biomas ni las cuevas).
 
 ### Objetos planos y la mano (`effects.js`)
 
@@ -183,6 +198,27 @@ Todo puro (sin pantalla): se prueba solo.
 - **Barra:** 10 corazones y 10 muslos como `<img>` con iconos dibujados por código (3 estados cada uno), que se vuelven a pintar solo cuando cambia el valor.
 - Con `creative` activo no se aplica nada y la barra se oculta.
 
+### Mobs (`mobs.js`) y la física compartida (`fisica.js`)
+
+- **`fisica.js`:** `colisiona(x, y, z, w, h)` dice si una caja (medio ancho `w`, alto `h`, pies en `y`) toca un bloque sólido; `moverEje(cuerpo, eje, d, w, h)` mueve un cuerpo (`{ pos, vel, onGround }`) en un eje, lo pega al bloque si choca y frena su velocidad en ese eje (al pisar marca `onGround`). `game.js` la usa para el jugador (`W = 0.3`, `PH = 1.8`) y `mobs.js` para los mobs.
+- **Un mob** es un objeto `{ tipo, def, grupo, patas, brazos, mat, pos, vel, onGround, yaw, vida, … }`. `TIPOS` tiene los datos de cada tipo (vida, caja, velocidad, botín, `pasivo` u `hostil`, y la función que arma su modelo). Para sumar un mob: una entrada en `TIPOS`, su `modelo…()` y, si aparece solo, tocar `intentarAparecer`.
+- **Modelo:** cajas con color por vértice (`pixelBox` de `effects.js`, como el jugador) **unidas en una sola geometría** (`unir`): cuerpo + cabeza en una malla y cada miembro en otra con su pivote, **5 mallas por mob**. La geometría se arma **una vez por tipo** y se comparte; el **material se clona por mob** (así el destello rojo, `emissive`, no le pega a los demás; no cuesta programas nuevos). Todos miran hacia −Z, como el jugador.
+- **IA** (`actualizarMob`, cada cuadro): `wx, wz` es hacia dónde quiere ir y `rapidez` a cuánto. Un mob que huye (`huir > 0`) se aleja de donde vino el golpe; un hostil a menos de 24 bloques va hacia el jugador y, a menos de 1,1 con la altura parecida, le pega con un enfriamiento de 1 s; si no, pasea (un rato quieto, un rato caminando a un rumbo al azar). Si choca contra un bloque salta (un escalón de 1 sí, de 2 no); si lleva 0,8 s chocando, elige otro rumbo.
+- **Física del mob:** pasos de 25 ms (`pasos = ceil(dt / 0.025)`) con gravedad o flotación en el agua. **Sin pasos cortos, un mob que cae rápido atraviesa un piso de 1 bloque.** Si el chunk de abajo no está cargado, se queda quieto.
+- **Aparición** (`actualizarMobs` → `intentarAparecer`): un intento cada 0,3 s (con menos de 3 mobs) o 1,5 s; elige un punto en un anillo alrededor del jugador, baja desde arriba hasta el primer suelo con 2 de aire y, si es agua, no aparece. Animales solo sobre césped (`id 1`); zombis de noche (`daylight < 0.4`) sobre cualquier suelo. Tope: `CONFIG.maxMobs`.
+- **Sol:** un zombi con `daylight > 0.55` y sin nada sólido encima hasta 24 bloques pierde 2 de vida por segundo (rojo tenue); sin botín.
+- **Combate:** `apuntarMob(origen, dirección, alcance)` prueba el rayo contra la caja de cada mob (método de las "losas") y devuelve el más cercano con su distancia `t`. En `game.js`, `raycast` ahora también devuelve `t` para los bloques: si el bloque está más cerca que el mob, el mob no se puede golpear; y si se apunta a un mob, `target` (el bloque) se descarta para no romper lo de atrás. `atacarMob` golpea cada 0,5 s con el click izquierdo mantenido; `golpear(mob, danio, ox, oz)` resta vida, empuja desde `(ox, oz)`, pone rojo al mob y hace huir a los pasivos; `matar` lo tira de costado 0,4 s, lo quita y suelta el botín con `spawnDrop` (no en creativo).
+- **No se guardan**: la partida no sabe de los mobs.
+- **Para probar:** `mc.spawnMob('cerdo', x, y, z)`, `mc.mobs`, `mc.golpearMob(mob, danio, ox, oz)`, `mc.quitarMob(mob)` y `mc.TIPOS`. `CONFIG.mobs = false` apaga la aparición automática.
+
+### Agua que fluye (`agua.js`)
+
+- **Ids:** 10 = fuente (nivel 0); 20 a 26 = niveles 1 a 7. `nivelAgua(b)` da el nivel y `alturaAgua(b)` la altura que ocupa.
+- **Modelo "de tirar" (pull):** `nivelDeseado(x, y, z)` calcula qué nivel le toca a una celda mirando a sus vecinos: agua arriba → 1; fuente al costado → 1; agua que fluye de nivel L al costado → L + 1 (solo hasta 7); un vecino con aire o agua que fluye debajo **no se abre de costado** (cae). Si el resultado difiere del contenido actual, `mirar` pone el bloque (o aire si no le toca nada). Los cambios activan a los vecinos.
+- **Secado:** sin fuente que la alimente, cada celda sube de nivel de a uno por paso hasta pasar el 7 y desaparece (todas a la vez, así que una charca se seca en ~7 pasos y una cascada en tantos pasos como alto tenga).
+- **Qué se revisa:** `activeWater` (un `Set` de claves `waterKey(x, y, z)`) que llena `setBlock`. `pasoAgua()` toma hasta 400, las mira y rehace las mallas. `tickAgua(dt)` lo llama el bucle de `game.js` cada 0,2 s (no en pausa). Las celdas en chunks sin cargar se saltean.
+- **Para probar sin esperar:** `mc.pasoAgua()` desde la consola o las pruebas.
+
 ## Cómo se dibuja el mundo
 
 Es la parte más técnica; está en `world.js` (`buildChunkMesh`):
@@ -191,7 +227,8 @@ Es la parte más técnica; está en `world.js` (`buildChunkMesh`):
 2. **Eliminación de caras ocultas:** solo se genera una cara si el vecino no es opaco. Las caras entre dos bloques sólidos no existen.
 3. **Ambient occlusion por vértice:** cada vértice se oscurece según los 3 bloques vecinos de su esquina (niveles en `AO_LEVELS`). La diagonal del cuadrado se elige para que el degradado no quede torcido.
 4. **Hojas:** con `fancyLeaves` apagado, solo se dibujan las caras contra algo que no sea hoja. Un atributo por vértice (`sway`) las mece con un shader inyectado en `onBeforeCompile`.
-5. **Agua:** va en una malla aparte, translúcida, con la cara superior más baja (0.88) salvo que haya agua encima.
+5. **Agua:** va en una malla aparte, translúcida. La altura de cada celda baja con su nivel (`alturaAgua`: 0,88 la fuente, menos cuanto más lejos) salvo que haya agua encima (altura 1). Las caras de costado entre dos celdas de agua se dibujan solo en la parte que sobresale de la vecina más baja.
+5b. **Luz del cielo (cuevas oscuras):** `fillPad` calcula para cada columna del `pad` el nivel del bloque opaco más alto (`skyY`). Cada cara se multiplica por `LUZ[d]`, donde `d` es cuántos bloques hay entre la celda que mira la cara y ese techo (`d < 1` = a cielo abierto = 1). `LUZ` baja `CONFIG.luzPorBloque` por bloque hasta `CONFIG.luzMinima`. Las hojas y el agua no cuentan como techo. Solo mira la columna: no entra luz de costado por la boca de una cueva.
 6. **Buffers reutilizables:** los arreglos de vértices se reusan entre chunks y crecen si hace falta.
 
 Cada chunk produce como máximo 2 mallas (sólidos y agua), que se agregan a `scene`.
@@ -293,7 +330,13 @@ El README original dice que la estructura está "pensada para pedirle cambios ar
 | Una receta de crafteo nueva | `objetos.js` (`RECETAS`) |
 | El crafteo, las herramientas, el desgaste o el catálogo creativo | `inventory.js` (pantalla y lógica), `objetos.js` (reglas) y `index.html` (estilos) |
 | Cómo se ve una textura | `textures.js` |
-| Cómo es el terreno, árboles, cuevas | `world.js` (`heightAt`, `generateChunk`) |
+| Un mob nuevo, su IA, su botín o cuántos aparecen | `mobs.js` (`TIPOS`, `actualizarMob`, `intentarAparecer`) y `config.js` (`maxMobs`) |
+| Cómo chocan los cuerpos con los bloques (jugador y mobs) | `fisica.js` |
+| Pegarle a un mob, el arma y el daño | `game.js` (`atacarMob`), `mobs.js` (`golpear`) y `config.js` (`danio` en `ITEMS`) |
+| Cómo es el terreno, árboles, biomas, cuevas, minerales, cabañas | `world.js` (`heightAt`, `biomeAt`, `esCueva`, `cabanaEn`, `generateChunk`) |
+| Qué tan oscuras son las cuevas | `config.js` (`luzMinima`, `luzPorBloque`) y `world.js` (`fillPad`, `LUZ`) |
+| Cómo fluye el agua | `agua.js` (reglas) y `world.js` (qué celdas se revisan, y la forma en la malla) |
+| Un mineral o una herramienta con "nivel" | `config.js` (`nivel` en `BLOCKS` e `ITEMS`) y `objetos.js` (`puedeRecoger`) |
 | Cielo, luz, hora | `sky.js` |
 | Presets de calidad (alta/media/baja) | `config.js` (`QUALITY`) y `quality.js` |
 | Algo del inventario | `inventory.js` (datos y UI) + `index.html` (estilos) |
@@ -311,8 +354,12 @@ Leídos del código; no son bugs confirmados, sino lugares donde un cambio puede
 
 - **Dependencias circulares:** hoy no hay y las reglas de arriba las evitan. Si un archivo "de abajo" necesita algo de uno "de arriba", la solución es pasarlo por parámetro o mover código, no importar en círculo.
 - **Reasignar lo importado** (`daylight = …` desde otro archivo) da error en el navegador. Usar un objeto o una función, como `shadow.dirty`.
-- **`OPAQUE` en `world.js`** se arma con un bucle fijo de ids 1 a 9. Un bloque nuevo con id distinto necesita ajustarlo.
-- **`NTILES = 13` y el atlas** son números sueltos que deben coincidir con las texturas dibujadas (11 de bloques más 2 de la mesa de crafteo). Los objetos planos no usan el atlas.
+- **`OPAQUE` e `IS_WATER` en `world.js`** se arman solos con las claves de `BLOCKS` (todo tapa, menos las hojas y el agua). Un bloque transparente nuevo tiene que ajustarlos.
+- **`NTILES = 20` y el atlas** son números sueltos que deben coincidir con las texturas dibujadas (0–19). Los objetos planos no usan el atlas.
+- **El agua tiene 8 ids** (10 y 20–26). Todo código que pregunte "¿es agua?" tiene que usar `isWater(b)`; un `=== WATER` ignora el agua que fluye (el jugador no nadaría en ella, se podría poner un bloque dentro, etc.).
+- **Los mobs usan `isSolidB` y `getBlock`** como el jugador: si cambia qué es sólido, cambia por dónde caminan. **`getBlock` devuelve aire en chunks sin cargar**, por eso un mob sobre un chunk sin cargar se detiene (si no, caería para siempre).
+- **El material de cada mob es una copia** (`baseMat.clone()`): hay que llamar a `quitar(mob)` (libera el material); sacarlo solo de la escena deja basura.
+- **`setBlock(x, y, z, b, diferir)`** avisa al agua (`activeWater`) cuando hay agua en la celda o pegada a ella. Con `diferir = true` no rehace la malla en el momento: la deja en `mallasPendientes` hasta `rehacerMallas()` (lo usa `agua.js`, para rehacer un chunk una sola vez por paso).
 - **Los ids de objetos (100 en adelante) nunca deben terminar en `chunks`** (el mundo guarda un byte por bloque y `BLOCKS[100]` no existe). Por eso `placeBlock` descarta todo lo que está en `ITEMS` antes de poner nada.
 - **Cambiar un id guardado rompe las partidas.** Las manzanas eran el 11 y pasaron al 100 cuando el 11 se volvió la mesa de crafteo; se resolvió con la marca `itemsV` en el guardado (ver abajo). Si hay que mover otro id, hace falta una migración igual.
 - **Las herramientas no se apilan** (`maxPila` = 1). Cualquier código nuevo que cree o mueva pilas tiene que pasar por `nuevaPila`/`invAdd`/`moveInto` para no perder el campo `dano`.

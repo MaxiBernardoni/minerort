@@ -22,12 +22,15 @@ const RECETAS = [
   { forma: [[TABLONES], [TABLONES]], da: [PALO, 4] },                // 2 tablones, uno sobre otro -> 4 palos
   { forma: [[TABLONES, TABLONES], [TABLONES, TABLONES]], da: [MESA, 1] },   // 4 tablones en cuadrado -> mesa de crafteo
 ];
-// Herramientas: cada material da pico, hacha y pala. Todas ocupan 3 filas, asi que se fabrican en la mesa (3x3).
-for (const [m, pico, hacha, pala] of [
-  [TABLONES, ID.PICO_MADERA, ID.HACHA_MADERA, ID.PALA_MADERA],
-  [ADOQUIN, ID.PICO_PIEDRA, ID.HACHA_PIEDRA, ID.PALA_PIEDRA],
+// Herramientas: cada material da pico, hacha, pala y espada. Todas ocupan 3 filas, asi que se fabrican en la mesa (3x3).
+for (const [m, pico, hacha, pala, espada] of [
+  [TABLONES, ID.PICO_MADERA, ID.HACHA_MADERA, ID.PALA_MADERA, ID.ESPADA_MADERA],
+  [ADOQUIN, ID.PICO_PIEDRA, ID.HACHA_PIEDRA, ID.PALA_PIEDRA, ID.ESPADA_PIEDRA],
+  [ID.LINGOTE, ID.PICO_HIERRO, ID.HACHA_HIERRO, ID.PALA_HIERRO, ID.ESPADA_HIERRO],
+  [ID.DIAMANTE, ID.PICO_DIAMANTE, ID.HACHA_DIAMANTE, ID.PALA_DIAMANTE, ID.ESPADA_DIAMANTE],
 ]) {
   RECETAS.push(
+    { forma: [[m], [m], [PALO]], da: [espada, 1] },
     { forma: [[m, m, m], [0, PALO, 0], [0, PALO, 0]], da: [pico, 1] },
     { forma: [[m, m], [m, PALO], [0, PALO]], da: [hacha, 1] },
     { forma: [[m], [PALO], [PALO]], da: [pala, 1] },
@@ -58,17 +61,18 @@ function buscarReceta(grilla, ancho) {
 }
 
 // ---------- Herramientas ----------
-// Multiplicador de velocidad al romper `bloque` (una entrada de BLOCKS) con lo que se sostiene
-function velocidadDeMinado(idEnMano, bloque) {
-  const item = ITEMS[idEnMano];
-  return item && item.tool && item.tool === bloque.herramienta ? item.velocidad : 1;
-}
-
-// ¿Suelta algo el bloque al romperlo con lo que se sostiene? (la piedra sin pico no)
+// ¿Suelta algo el bloque al romperlo con lo que se sostiene? (la piedra sin pico no, el diamante sin hierro tampoco)
 function puedeRecoger(idEnMano, bloque) {
   if (!bloque.necesita) return true;
   const item = ITEMS[idEnMano];
-  return !!(item && item.tool === bloque.herramienta);
+  return !!(item && item.tool === bloque.herramienta && item.nivel >= (bloque.nivel || 0));
+}
+
+// Multiplicador de velocidad al romper `bloque` (una entrada de BLOCKS) con lo que se sostiene.
+// Una herramienta que no alcanza para recoger el bloque tampoco lo acelera.
+function velocidadDeMinado(idEnMano, bloque) {
+  const item = ITEMS[idEnMano];
+  return item && item.tool && item.tool === bloque.herramienta && puedeRecoger(idEnMano, bloque) ? item.velocidad : 1;
 }
 
 const esHerramienta = id => !!(ITEMS[id] && ITEMS[id].tool);

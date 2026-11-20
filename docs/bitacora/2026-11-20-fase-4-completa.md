@@ -1,0 +1,35 @@
+# Sesión 2026-11-20 · Fase 4 completa: mobs y combate
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** hacer la Fase 4 del roadmap (mobs). Es la segunda mitad del pedido *"Hace la fase 3, ls 4 despues"*: se hizo primero la Fase 3 (ver [su bitácora](2026-11-20-fase-3-completa.md)) y después esta, en la misma sesión y sin preguntas.
+- **Prompt(s) clave:** el de arriba. El roadmap tenía tres filas: entidades (reusando la física de `game.js` y el modelo de `character.js`), animales pasivos y luego enemigos, y combate.
+- **Resultado:** funcionó. `npm test` pasó de 72 a **80 pruebas**, todas verdes. **Sin commitear** (Fases 3 y 4 juntas en el árbol de trabajo; la Fase 2 está en `76eb7fd`).
+- **Decisiones que tomó la IA** (el roadmap no decía; todas fáciles de cambiar y anotadas en [04-roadmap.md](../04-roadmap.md)):
+  - **Tres mobs:** cerdo, vaca y zombi. Es lo mínimo que prueba las tres cosas (pasivo, pasivo con otro tamaño, hostil).
+  - **La carne se come cruda** (sin horno) y restaura 6 de hambre: es la segunda comida del juego, después de la manzana.
+  - **El zombi se quema de día** en vez de desaparecer (con un techo se salva); no suelta nada si se quema.
+  - **Las espadas** (madera, piedra, hierro, diamante: 4, 5, 6 y 7 puntos; la mano, 1) usan las mismas recetas de forma que las herramientas, y el golpe cada 0,5 s con el click mantenido (sin "ataque cargado").
+  - **Los mobs no se guardan en la partida.** Guardarlos obliga a decidir qué pasa con los que están lejos y a subir la versión del formato; mientras tanto aparecen otros al abrir.
+  - **La IA es tonta a propósito:** pasea, huye, persigue y salta escalones de 1 bloque. Sin caminos, sin esquivar precipicios, sin sonidos.
+- **Qué funcionó:**
+  - **Sacar la física de `game.js` primero (`fisica.js`).** El jugador y los mobs usan las mismas dos funciones (`colisiona`, `moverEje`); como `npm test` ya cubría al jugador (caer, saltar, paredes), la refactorización se comprobó sola: 72 de 72 antes de escribir un solo mob.
+  - **Modelos baratos desde el principio:** cada mob es **5 mallas** (cuerpo y cabeza unidos en una, y cada miembro con su pivote), con la geometría compartida entre mobs del mismo tipo y el material clonado solo por el destello rojo. Hay una prueba que lo cuenta, para que un cambio de modelo no sume llamadas de dibujo sin que nadie lo note.
+  - **Las pruebas con mobs son deterministas:** `arena()` apaga la aparición automática y las pruebas ponen los mobs a mano, quietos o con un rumbo forzado. Solo la prueba de aparición (que viaja a un lugar con césped) usa el azar, con tiempos de sobra.
+  - **Las capturas con las cosas lado a lado** (cerdo, vaca y zombi de frente y de perfil) mostraron lo que ninguna prueba ve: los tres se reconocen, la vaca de frente tiene una mancha negra enorme en la cara, y el zombi se veía **entero rojo**.
+  - **El script de sabotaje** (el de la Fase 3, con otros casos) rompió la lógica de mobs en 19 lugares.
+- **Qué falló o hubo que corregir:**
+  - **El zombi de la captura estaba rojo de pies a cabeza.** No era un bug de pintura: de día se quema, y mientras se quemaba reusaba el mismo destello rojo fuerte del golpe. Se separaron los dos: **golpe = rojo fuerte, quemarse = rojo tenue**. Las escenas de captura quedaron a mediodía.
+  - **La carne parecía un círculo rojo** (se confundía con la manzana en el inventario). Se le dibujó un hueso en diagonal para que se lea como un muslo.
+  - **Una sola prueba falló al primer intento, y fue culpa de la prueba:** comparaba el ángulo hacia donde mira el cerdo con −π/2 y daba 4,71 (que es lo mismo, una vuelta más). Se comparó con el coseno de la diferencia.
+  - **La prueba del golpe no detectaba que el golpe seguía rompiendo el bloque de atrás** (si se quita `if (mobApuntado) target = null`, el mob se golpea igual y además se mina lo que hay detrás). Se agregó la comprobación de que `mining` no está activo al golpear.
+- **Lección:** **sacar una pieza compartida antes de agregar a quien la comparte, cuando ya hay pruebas que la cubren.** Con `fisica.js` el riesgo de tocar la física del jugador quedó en un solo paso verificable (72 de 72) y no mezclado con los 292 renglones de mobs. Y, de nuevo, **mirar la captura**: el zombi rojo y la carne-manzana no se ven en ninguna prueba.
+- **Quedó pendiente:**
+  - [ ] **Commitear** (Fases 3 y 4 sin commit; conviene hacerlo en dos si Max quiere: la Fase 3 está en `world.js`, `config.js`, `textures.js`, `agua.js` y sus pruebas; la Fase 4 en `mobs.js`, `fisica.js`, `game.js` y las suyas).
+  - [ ] **Que Max juegue y mire:** cómo se ven y caminan los mobs, si 3 puntos por segundo del zombi es mucho, si matarlos con la mano cuesta demasiado, y cuántos aparecen. Se miró solo en capturas (una ventana sin pantalla, sin el mouse real).
+  - [ ] **Medir los FPS con mobs en una PC modesta.** Son 5 mallas por mob (12 mobs = 60 mallas, y el doble con sombras); `CONFIG.maxMobs` es la perilla.
+  - [ ] **Guardar los mobs** en la partida (al cerrar y abrir desaparecen los de antes).
+  - [ ] **Mejor IA:** esquivar precipicios, buscar caminos, que los zombis se junten, que los animales sigan comida y se reproduzcan.
+  - [ ] **Más mobs y armas:** esqueletos, arañas, ovejas, gallinas; arcos; armaduras (junto con las ranuras de armadura del inventario que se dejaron afuera en la Fase 2).
+  - [ ] **Sonidos** (pasos, golpes, gruñidos).
+  - [ ] **Horno y antorchas**, para que la carne se cocine, el hierro se funda y las cuevas se iluminen.
+  - [ ] **Los zombis no aparecen en cuevas** (solo en la superficie y de noche).

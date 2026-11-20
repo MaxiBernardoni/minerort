@@ -66,22 +66,26 @@ Preparar el terreno para que el resto no se rompa. No agrega nada visible.
 
 > **Decisiones que tomó la IA donde el roadmap no decía nada** (todas fáciles de cambiar, ver [02-estado-actual.md](02-estado-actual.md#crafteo-y-herramientas)): qué objetos y recetas hay; que la piedra necesite pico (cambia el ritmo del comienzo: con el kit inicial se puede fabricar todo); los números de velocidad y duración (salen de Minecraft); que cada bloque roto gaste un uso aunque no sea el tipo de la herramienta; que no haya "niveles" de herramienta; y que el click derecho sobre una mesa siempre la abra.
 
-### Fase 3 · Mundo más rico
+### Fase 3 · Mundo más rico ✅
 
-| Función | Depende de | Qué toca |
+| Función | Depende de | Qué se hizo (2026-11-20) |
 |---|---|---|
-| **Cuevas y minerales** | Terreno 3D | `world.js`: hoy el terreno es un mapa de alturas (una superficie por columna). Hay que sumar ruido 3D. |
-| **Biomas** (desierto, nieve, bosque…) | Más bloques | `world.js`, `sky.js` (color de niebla), `textures.js`. |
-| **Agua que fluye** | — | `world.js` y una regla de actualización de bloques. |
-| **Estructuras y árboles variados** | Biomas | `world.js`. |
+| ✅ **Cuevas y minerales** | Terreno 3D | Tubos de ruido 3D bajo la superficie (~4% del subsuelo), pozos de entrada, y vetas de **hierro** y **diamante** (bloques 12 y 13). Las cuevas se ven oscuras (la luz del cielo baja bajo un techo). Con los minerales: lingote y diamante, herramientas de hierro y de diamante, y **niveles de herramienta** (el diamante pide pico de hierro). |
+| ✅ **Biomas** (desierto, nieve, bosque…) | Más bloques | Cuatro: llanura, bosque, desierto y nevado, con nieve, cactus y abedul como bloques nuevos. Sin cambiar las alturas. *No se cambió el color de la niebla ni del cielo por bioma.* |
+| ✅ **Agua que fluye** | — | `agua.js`: niveles de 1 a 7, cascadas, secado. Solo se mueve cuando un bloque cambia junto a ella. |
+| ✅ **Estructuras y árboles variados** | Biomas | Cabañas con mesa de crafteo, robles grandes, abedules, pinos y cactus. |
 
-### Fase 4 · Mobs
+> **Decisiones que tomó la IA donde el roadmap no decía nada** (todas fáciles de cambiar, ver [02-estado-actual.md](02-estado-actual.md)): el mineral de hierro **suelta directo el lingote** (no hay horno ni carbón todavía); las cuevas tienen una luz mínima de 50% (sin antorchas, con menos es injugable: `CONFIG.luzMinima`); el agua no crea fuentes nuevas ni empuja al jugador; el nevado tiene pinos y no hay hielo; la única estructura es la cabaña (aldeas, minas y templos quedan para después); los mundos viejos quedan con costuras (ver limitación 8).
 
-| Función | Depende de | Qué toca |
+### Fase 4 · Mobs ✅
+
+| Función | Depende de | Qué se hizo (2026-11-20) |
 |---|---|---|
-| **Entidades** (sistema base: posición, física, dibujo) | Fase 1 (vida) | Archivo nuevo. Reutilizar la física de `game.js` (`collides`, `moveAxis`) y el modelo de `character.js`. |
-| **Animales pasivos, luego enemigos** | Entidades | Archivo nuevo. IA simple primero. |
-| **Combate** | Vida, entidades | `game.js`. |
+| ✅ **Entidades** (sistema base: posición, física, dibujo) | Fase 1 (vida) | `fisica.js` (nuevo): el choque de cajas contra bloques que estaba dentro de `game.js`, ahora compartido por el jugador y los mobs. `mobs.js` (nuevo): cada mob es un objeto con posición, velocidad, caja, vida y un grupo de 5 mallas; los modelos se arman una vez por tipo. |
+| ✅ **Animales pasivos, luego enemigos** | Entidades | Cerdo y vaca (pasean al azar, huyen al ser golpeados, sueltan carne) y zombi (de noche persigue y pega; de día se quema). Aparecen solos cerca del jugador hasta `CONFIG.maxMobs`. |
+| ✅ **Combate** | Vida, entidades | Click izquierdo sobre un mob (rayo contra las cajas), daño de la mano (1) y de las **espadas** (4 a 7, con desgaste), empujón, botín, y el daño del zombi al jugador (3 por segundo). |
+
+> **Decisiones que tomó la IA donde el roadmap no decía nada** (todas fáciles de cambiar, ver [02-estado-actual.md](02-estado-actual.md)): solo tres mobs (los pasivos son dos y el hostil, uno); la carne se come cruda (no hay horno); los zombis se queman de día en vez de desaparecer; los mobs no se guardan; cualquier arma pega con click mantenido cada 0,5 s (no hay "ataque cargado"); y no hay sonido ni música. Los números (vida, daño, velocidad) salen de Minecraft.
 
 ### Fase 5 · Distribución
 

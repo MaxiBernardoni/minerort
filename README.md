@@ -13,20 +13,35 @@ npm run captura # saca capturas del juego en capturas/ para revisar cómo se ve
 
 ## Controles
 
-WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq. mantenido: romper · click der.: poner (o comer una manzana, o abrir una mesa de crafteo) · 1-9 o rueda: elegir ranura · E: inventario · F volar · V primera/tercera persona · T avanzar la hora · G sombras · K calidad (alta/media/baja) · Esc pausa · F12 consola
+WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq. mantenido: romper (o pegarle a un mob) · click der.: poner (o comer una manzana, o abrir una mesa de crafteo) · 1-9 o rueda: elegir ranura · E: inventario · F volar · V primera/tercera persona · T avanzar la hora · G sombras · K calidad (alta/media/baja) · Esc pausa · F12 consola
 
 ## Inventario
 
 - 36 espacios: barra rápida (1-9) + mochila. Los bloques que rompés caen al suelo y se recogen al acercarte; al poner uno se gasta.
 - Pantalla (E): click agarra/suelta, click derecho mitad/uno, Shift+click mueve rápido, 1-9 sobre un espacio lo manda a la barra, click afuera lo tira.
 - Modo creativo (botón dentro del inventario): catálogo de todos los bloques y objetos, con pestañas (Todo / Bloques / Objetos) y un buscador. No se gasta nada. `CONFIG.creative` lo deja activado desde el inicio.
-- Césped suelta tierra, hojas sueltan a veces (ver `drop` en `src/config.js`). **La piedra, el adoquín y el ladrillo solo sueltan algo si los rompés con un pico.**
+- Césped suelta tierra, hojas sueltan a veces (ver `drop` en `src/config.js`). **La piedra, el adoquín y el ladrillo solo sueltan algo si los rompés con un pico.** El mineral de hierro pide pico de piedra y el de diamante pico de hierro.
 
 ## Crafteo y herramientas
 
 - **Crafteo:** el inventario (E) tiene una grilla de 2×2; la **mesa de crafteo** (click derecho sobre ella) tiene una de 3×3. Poné los ingredientes y sacá el resultado (Shift+click: todo lo que se pueda). Las recetas no dependen de la posición ni del lado.
 - **Recetas:** 1 madera → 4 tablones · 2 tablones uno sobre otro → 4 palos · 4 tablones en cuadrado → mesa de crafteo · pico, hacha y pala de tablones o de adoquín con palos (3×3 de la mesa).
-- **Herramientas:** el pico rompe más rápido piedra, adoquín y ladrillo; el hacha, madera, tablones y mesa; la pala, tierra, césped y arena. Las de madera ×2 (59 usos) y las de piedra ×4 (131 usos). Se desgastan (barrita en el inventario) y se rompen al agotarse. No se apilan.
+- **Espadas:** de madera, piedra, hierro y diamante (2 material sobre 1 palo). Pegan 4, 5, 6 y 7 puntos (la mano, 1) y gastan un uso por golpe.
+- **Herramientas:** el pico rompe más rápido piedra, adoquín, ladrillo y minerales; el hacha, madera, tablones y mesa; la pala, tierra, césped, arena y nieve. Madera ×2 (59 usos), piedra ×4 (131), hierro ×6 (250) y diamante ×8 (1561). Se desgastan (barrita en el inventario) y se rompen al agotarse. No se apilan.
+- Las de hierro y diamante se fabrican con las mismas formas, con **lingotes de hierro** o **diamantes** en lugar de tablones.
+
+## Mundo
+
+- **Biomas:** llanura, bosque, desierto (arena y cactus) y nevado (nieve y pinos). Lo alto de las montañas es nieve.
+- **Cuevas** bajo tierra, con pozos de entrada, oscuras (sin antorchas todavía), y vetas de **hierro** y **diamante** (el diamante solo abajo, hasta y=14).
+- **Agua que fluye:** si rompés un bloque que contenía agua, entra; una fuente en el aire cae en cascada. Se seca sola al sacarle la fuente.
+- **Cabañas** de tablones, raras, con una mesa de crafteo adentro.
+
+## Mobs
+
+- **Cerdos y vacas** pasean por el césped; al pegarles huyen y sueltan **carne** (click derecho: se come, restaura 6 de hambre).
+- **Zombis** salen de noche, te persiguen y pegan 3 puntos por segundo (1,5 corazones). De día, si les da el sol, se queman. Un techo los protege.
+- Se les pega con click izquierdo (a menos de 3,5 bloques). `CONFIG.mobs` los apaga y `CONFIG.maxMobs` limita cuántos hay.
 
 ## Salud (supervivencia)
 
@@ -61,7 +76,10 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 | `src/scene.js` | Renderer, cámaras y luces |
 | `src/quality.js` | Presets de calidad (alta / media / baja), tecla K |
 | `src/player.js` | Estado compartido del jugador y del mouse |
-| `src/world.js` | Terreno, agua, árboles, chunks y mallas 3D |
+| `src/world.js` | Terreno, biomas, cuevas, minerales, árboles, cabañas, chunks y mallas 3D |
+| `src/agua.js` | Agua que fluye |
+| `src/fisica.js` | Choque de cajas contra los bloques (lo usan el jugador y los mobs) |
+| `src/mobs.js` | Cerdos, vacas y zombis: modelos, IA, aparición y combate |
 | `src/sky.js` | Cielo, sol/luna/estrellas, nubes y ciclo de día |
 | `src/effects.js` | Partículas, grietas y el brazo/bloque en primera persona |
 | `src/character.js` | Cuerpo del personaje, sombra y tercera persona |
@@ -96,9 +114,8 @@ La carpeta [`docs/`](docs/README.md) explica el proyecto en detalle: [visión](d
 
 (Versión corta. El plan completo y ordenado está en [docs/04-roadmap.md](docs/04-roadmap.md).)
 
-1. Cuevas con ruido 3D y minerales.
+1. Antorchas y horno (para que las cuevas y el hierro tengan sentido completo), y más mobs.
 2. Menú de opciones y más cosas en el menú de mundos (renombrar, duplicar, elegir el modo).
-3. Crafteo (madera → tablones, palos, herramientas).
-4. Mobs simples que caminen (animación con partes del cuerpo).
-5. Sonidos: pasos, romper, agua, ambiente.
-6. Empaquetar como .exe con electron-builder.
+3. Armaduras y arcos.
+4. Sonidos: pasos, romper, agua, ambiente.
+5. Empaquetar como .exe con electron-builder.

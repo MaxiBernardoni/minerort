@@ -1,0 +1,35 @@
+# Sesión 2026-11-20 · Fase 3 completa: cuevas, minerales, biomas, agua que fluye y cabañas
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** hacer la Fase 3 del roadmap ("mundo más rico"). Max pidió, en un mismo mensaje y en este orden, *"Hace la fase 3, ls 4 despues"* (la fase 4, los mobs, viene después).
+- **Prompt(s) clave:** el de arriba. No hubo preguntas previas: el roadmap tenía las cuatro filas (cuevas y minerales, biomas, agua que fluye, estructuras y árboles variados) y la anterior (la Fase 2) había terminado con una pista: *"los minerales darían sentido a un nivel de herramienta"*.
+- **Resultado:** funcionó. `npm test` pasó de 62 a **72 pruebas**, todas verdes. **Sin commitear** (Max pide el commit; esta fase y la anterior ya están en el árbol de trabajo o en `76eb7fd`).
+- **Decisiones que tomó la IA** (el roadmap no decía; todas fáciles de cambiar y anotadas en [04-roadmap.md](../04-roadmap.md)):
+  - **El mineral de hierro suelta directo el lingote**: no hay horno ni carbón. Si se agrega horno, el mineral tiene que soltar el mineral crudo.
+  - **Niveles de herramienta** (madera 0, piedra 1, hierro 2, diamante 3): el hierro pide piedra, el diamante pide hierro. Una herramienta que no alcanza **tampoco acelera** el bloque (si acelerara, un pico de madera sacaría un diamante rápido, sin soltar nada).
+  - **El agua tiene 8 ids** (10 fuente y 20–26 fluyendo). Era la decisión más cara: obligó a cambiar todos los `=== WATER` por `isWater()`.
+  - **El agua no crea fuentes nuevas** ni empuja al jugador, y solo se mueve cuando un bloque cambia junto a ella (un lago sin tocar es estático y no cuesta nada).
+  - **Las cuevas tienen una luz mínima de 50%** (`CONFIG.luzMinima`). Al principio puse 15% por copiar a Minecraft y las capturas mostraron que era casi negro: sin antorchas no se puede jugar así.
+  - **Una sola estructura (la cabaña)**, y los mundos viejos quedan con costuras (limitación 8 del estado actual).
+- **Qué funcionó:**
+  - **Probar la generación sin moverse:** `mc.generateChunk(cx, cz)` (ahora expuesto) arma un chunk "en seco", sin cargarlo al juego. Eso permitió probar cuevas, minerales, biomas y cabañas mirando cientos de chunks en milisegundos, con reglas ("el diamante no pasa de y=17", "cada cactus está en una columna de desierto") en vez de bloques exactos, que se romperían con cualquier ajuste.
+  - **Sondear antes de ajustar:** un script chico (`explora.js`, en la carpeta temporal, abre el juego en Electron y corre un archivo adentro) midió los porcentajes de biomas, el aire bajo tierra, los minerales por chunk y los milisegundos por chunk. Con eso se corrigieron los umbrales (el desierto salía 30% del mundo; quedó en 19%) y la rareza del diamante (1,7 por chunk; quedó en 1) antes de escribir una sola prueba.
+  - **Mirar las capturas otra vez:** las escenas nuevas (bloques, agua, cueva, cabaña, un paisaje de cada bioma) mostraron lo que ninguna prueba ve: la cueva casi negra (arreglo: 15% → 50%), y que el cactus, el abedul y los minerales se distinguen bien.
+  - **El script de sabotaje** (aplica el cambio, corre las pruebas filtradas, restaura y compara con `cmp`) hizo el trabajo de las 17 roturas sin errores de restauración.
+- **Qué falló o hubo que corregir:**
+  - **El agua se desbordó dos veces antes de andar.** La primera: una celda de agua que cae (con agua que fluye debajo) se abría de costado, así que cada cascada se ensanchaba hacia abajo y llenaba miles de bloques. Se corrigió con la regla de Minecraft: **el agua sobre un hueco (aire o agua que fluye) cae en vez de abrirse**. La segunda: la regla valía solo para el agua que fluye y no para la **fuente**, así que una fuente en el aire dibujaba una cortina de cascadas; ahora vale para todas.
+  - **El primer sabotaje "no detectó" 13 de 17 roturas.** Era mentira: el script pasaba el filtro con espacios (`"cuevas: hay tuneles"`) y al armar el comando se partía en varios argumentos, así que las pruebas ni corrían. Se arregló filtrando con `.*`. De ahí salió la regla: **no pongas espacios en el filtro de `npm test`**.
+  - **Dos roturas seguían sin detectarse con el filtro bien puesto, y las dos eran culpa mía.** (1) La prueba de la luz comparaba contra `CONFIG.luzMinima + 0.2`: con `luzMinima = 1` el umbral era 1,2 y todo pasaba (una prueba que usa el valor sabotado para decidir no prueba nada; se agregó una comparación fija). (2) El corte del agua en el nivel 7 era un `if` redundante: el valor "ninguno" ya valía 8 y cortaba solo. Se borró el `if`, se nombró `NIVEL_MAX` y ahora sí se detecta.
+  - Una escena de captura declaraba `const P` y chocaba con otra (todas corren en el mismo ámbito): cada escena nueva va entre llaves.
+  - La prueba del lago asumía que la orilla estaba al este; se rehízo para buscar en las cuatro direcciones.
+- **Lección:** **una prueba tiene que fallar cuando el código está roto, y la única forma de saberlo es romperlo.** Hoy 13 sabotajes "no detectados" eran el script y 2 eran pruebas que se engañaban solas; sin el sabotaje habrían quedado como pruebas verdes que no prueban nada. Y para un simulador (el agua): **pensar la regla de a una celda y comprobarla con un caso chico antes de mirar el efecto grande**; los desbordes se vieron en 5 líneas de números por paso, no mirando el mundo.
+- **Quedó pendiente:**
+  - [ ] **Commitear** (la Fase 3 está sin commit; la Fase 2 está en `76eb7fd`).
+  - [ ] **Que Max juegue y mire:** los biomas, la oscuridad de las cuevas (si 50% es mucho o poco: `CONFIG.luzMinima`), el agua que fluye y las cabañas. Las capturas salen de una ventana sin pantalla y los números salen de Minecraft.
+  - [ ] **Medir en una PC modesta.** En la de las pruebas: ~0,7 ms por chunk generado y ~1,1 ms por malla. No se midió en una PC chica ni cuántos FPS cuesta el agua con muchas celdas.
+  - [ ] **Antorchas y horno** (luz por bloque y fundir el hierro): hoy las cuevas son tenues y el mineral suelta el lingote directo.
+  - [ ] **Cambiar el color de la niebla/cielo por bioma**, hielo en el nevado, y más estructuras (aldeas, minas, templos): el roadmap original las mencionaba, no se hicieron.
+  - [ ] **Corriente de agua** que empuje al jugador, y fuentes nuevas (dos fuentes juntas hacen una tercera) si se agregan cubos.
+  - [ ] **La luz de las cuevas solo mira la columna:** no entra luz de costado por la boca de una cueva (se ve oscuro un metro adentro).
+  - [ ] **Los pozos de entrada son caídas de hasta 12 bloques** que duelen y no tienen escalera.
+  - [ ] **Fase 4 (mobs)**: lo que Max pidió "después".

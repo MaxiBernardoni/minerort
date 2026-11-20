@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { BLOCKS, ID } from './config.js';
 
-const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 13;
+const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 20;
 
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = NTILES * CELL;
@@ -108,13 +108,14 @@ paint(1, (x, y) => {                                                            
   return mulC(dirtColor(x, y, 13), y === depth ? 0.78 : 1);
 });
 paint(2, (x, y) => dirtColor(x, y, 20));                                          // tierra
-paint(3, (x, y) => {                                                              // piedra
+function piedraColor(x, y) {
   let c = lerpC([102, 102, 106], [144, 144, 148], stretch(tfbm(x, y, 30)));
   if (Math.abs(tn(x, y, 5, 31) - 0.5) < 0.016 || Math.abs(tn(x, y, 9, 32) - 0.5) < 0.012) c = mulC(c, 0.68); // grietas
   const r = rnd(x, y, 33);
   if (r < 0.06) c = mulC(c, 0.82); else if (r > 0.95) c = mulC(c, 1.15);
   return c;
-});
+}
+paint(3, piedraColor);                                                            // piedra
 paint(4, (x, y) => {                                                              // madera (lado)
   const g = tn2(x, y, 12, 2, 40);
   let c = lerpC(BARK_DARK, BARK_LIGHT, g);
@@ -179,6 +180,55 @@ paint(12, (x, y) => {                                                           
   if (Math.abs((x - 6) - (26 - y) * 0.62) < 1.3 && y >= 10 && y <= 26) return [90, 62, 34];      // mango
   if (y >= 8 && y <= 11 && x >= 11 && x <= 24) return [128, 128, 132];                           // cabeza
   return tablon(x, y);
+});
+
+// ---------- Fase 3: minerales, nieve, abedul y cactus ----------
+// Mineral: la piedra con manchas del color del mineral (celdas de ruido celular elegidas al azar)
+function mineral(seed, oscuro, claro) {
+  return (x, y) => {
+    const w = worley(x, y, 4, seed);
+    if (w.id > 0.4 && w.f1 < 0.2 + w.id * 0.1) {
+      const t = rnd(x, y, seed + 3);
+      let c = lerpC(oscuro, claro, t * 0.6 + (1 - w.f1 * 2.4) * 0.4);
+      if (w.f1 > 0.26) c = mulC(c, 0.75);                                         // borde de la mancha
+      return c;
+    }
+    return piedraColor(x, y);
+  };
+}
+paint(13, mineral(140, [176, 118, 84], [230, 188, 156]));                         // mineral de hierro (manchas color hierro oxidado)
+paint(14, mineral(150, [40, 188, 186], [190, 255, 250]));                         // mineral de diamante
+paint(15, (x, y) => {                                                             // nieve
+  let c = lerpC([226, 232, 242], [250, 252, 255], stretch(tfbm(x, y, 160)));
+  const r = rnd(x, y, 161);
+  if (r < 0.08) c = mulC(c, 0.92); else if (r > 0.96) c = [255, 255, 255];
+  return c;
+});
+paint(16, (x, y) => {                                                             // abedul (lado): corteza blanca con marcas oscuras
+  let c = lerpC([200, 196, 186], [236, 232, 222], tn2(x, y, 3, 8, 170));
+  if (rnd(x >> 2, y >> 1, 171) > 0.84 && (x & 3) < 3 && (y & 1) === 0) c = [62, 58, 54];
+  return mulC(c, 0.94 + rnd(x, y, 172) * 0.1);
+});
+paint(17, (x, y) => {                                                             // abedul (arriba)
+  if (Math.min(x, y, TILE - 1 - x, TILE - 1 - y) < 3) return mulC([214, 210, 198], 0.92 + rnd(x, y, 173) * 0.12);
+  const d = Math.hypot(x - 15.5, y - 15.5) + (tfbm(x, y, 174) - 0.5) * 3.5;
+  let c = lerpC([196, 178, 128], [222, 206, 158], Math.sin(d * 1.15) * 0.5 + 0.5);
+  if (d < 2.5) c = mulC(c, 0.85);
+  return mulC(c, 0.95 + rnd(x, y, 175) * 0.1);
+});
+paint(18, (x, y) => {                                                             // cactus (lado): costillas verticales y espinas
+  const costilla = x % 8;
+  let c = lerpC([46, 110, 44], [86, 158, 64], tn2(x, y, 4, 12, 180));
+  if (costilla === 0 || costilla === 7) c = mulC(c, 0.66);
+  if (costilla === 0 && y % 6 === 2) c = [232, 236, 180];                          // espina
+  return mulC(c, 0.93 + rnd(x, y, 181) * 0.12);
+});
+paint(19, (x, y) => {                                                             // cactus (arriba)
+  const borde = Math.min(x, y, TILE - 1 - x, TILE - 1 - y);
+  if (borde < 3) return mulC([40, 100, 40], 0.92 + rnd(x, y, 182) * 0.14);
+  let c = lerpC([88, 160, 66], [116, 188, 84], rnd(x >> 2, y >> 2, 183));
+  if (Math.abs(x - 15.5) < 2 || Math.abs(y - 15.5) < 2) c = mulC(c, 0.85);
+  return c;
 });
 
 // ---------- sprites de objetos (los que NO son bloques: se dibujan planos, de 16x16) ----------
@@ -249,7 +299,18 @@ function ovalo() {
   }
   return { principal, claro };
 }
-const MATERIALES = { madera: { principal: '#a67c45', claro: '#cfa66a' }, piedra: { principal: '#7e7e7e', claro: '#b4b4b4' } };
+// Espadas: mango abajo a la izquierda, guarda cruzada y una hoja de dos pixeles de ancho hacia arriba a la derecha
+function espada(id, material) {
+  const p = {}, m = MATERIALES[material];
+  [[1, 14], [2, 13], [3, 12]].forEach(([x, y]) => { p[x + ',' + y] = MANGO; });
+  [[3, 10], [4, 11], [5, 12]].forEach(([x, y]) => { p[x + ',' + y] = '#8a6a2a'; });
+  for (let i = 0; i < 9; i++) { p[(5 + i) + ',' + (10 - i)] = m.principal; p[(6 + i) + ',' + (10 - i)] = i > 5 ? m.claro : m.principal; p[(5 + i) + ',' + (9 - i)] = m.claro; }
+  spriteDePixeles(id, p);
+}
+const MATERIALES = {
+  madera: { principal: '#a67c45', claro: '#cfa66a' }, piedra: { principal: '#7e7e7e', claro: '#b4b4b4' },
+  hierro: { principal: '#cdcdd4', claro: '#f6f6fa' }, diamante: { principal: '#2fcfc4', claro: '#b4fff8' },
+};
 function herramienta(id, tipo, material) {
   const p = {}, m = MATERIALES[material], cab = CABEZAS[tipo];
   for (let i = 0; i < 10; i++) p[(2 + i) + ',' + (13 - i)] = MANGO;                // el mango, en diagonal
@@ -265,6 +326,55 @@ function herramienta(id, tipo, material) {
 herramienta(ID.PICO_MADERA, 'pico', 'madera');   herramienta(ID.PICO_PIEDRA, 'pico', 'piedra');
 herramienta(ID.HACHA_MADERA, 'hacha', 'madera'); herramienta(ID.HACHA_PIEDRA, 'hacha', 'piedra');
 herramienta(ID.PALA_MADERA, 'pala', 'madera');   herramienta(ID.PALA_PIEDRA, 'pala', 'piedra');
+herramienta(ID.PICO_HIERRO, 'pico', 'hierro');   herramienta(ID.PICO_DIAMANTE, 'pico', 'diamante');
+herramienta(ID.HACHA_HIERRO, 'hacha', 'hierro'); herramienta(ID.HACHA_DIAMANTE, 'hacha', 'diamante');
+herramienta(ID.PALA_HIERRO, 'pala', 'hierro');   herramienta(ID.PALA_DIAMANTE, 'pala', 'diamante');
+espada(ID.ESPADA_MADERA, 'madera'); espada(ID.ESPADA_PIEDRA, 'piedra'); espada(ID.ESPADA_HIERRO, 'hierro'); espada(ID.ESPADA_DIAMANTE, 'diamante');
+paintSprite(ID.CARNE, [                                                          // un muslo: carne con un hueso que sale en diagonal
+  '................',
+  '................',
+  '....oooooo......',
+  '...oRRRRRRo.....',
+  '..oRRhhRRRRo....',
+  '..oRhhRRRRRRo...',
+  '..oRRRRRRRRRo...',
+  '..oRRRRRrrRRo...',
+  '...oRRRrrRRoWo..',
+  '....oRRRRRoWWWo.',
+  '.....ooooo.oWWWo',
+  '............ooWo',
+  '.............ooo',
+], { o: '#5a1418', R: '#c84a52', r: '#a8343c', h: '#f0a0a4', W: '#f2ead8' });
+paintSprite(ID.LINGOTE, [
+  '................',
+  '................',
+  '................',
+  '................',
+  '....oooooooooo..',
+  '...ohhhhhhhhhho.',
+  '..ohhhhhhhhhhlo.',
+  '.ooooooooooooloo',
+  '.oLLLLLLLLLLldo.',
+  '.oLLLLLLLLLLldo.',
+  '.oLLLLLLLLLLldo.',
+  '.ooooooooooooo..',
+], { o: '#44444c', h: '#f4f4f8', L: '#d2d2da', l: '#a6a6b0', d: '#82828c' });
+paintSprite(ID.DIAMANTE, [
+  '................',
+  '................',
+  '....oooooooo....',
+  '...ohhwhhmmmdo..',
+  '..ohhhhmmmmmddo.',
+  '.ooooooooooooooo',
+  '.ohhhhmmmmmmmddo',
+  '..ohhmmmmmmmddo.',
+  '...ohmmmmmmddo..',
+  '....ohmmmmddo...',
+  '.....ohmmddo....',
+  '......ohmdo.....',
+  '.......odo......',
+  '........o.......',
+], { o: '#0c5a62', h: '#a4f6f0', m: '#38d6cc', d: '#1a9aa0', w: '#ffffff' });
 
 const atlasTexture = new THREE.CanvasTexture(atlasCanvas);
 atlasTexture.magFilter = THREE.NearestFilter;

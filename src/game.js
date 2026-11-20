@@ -3,11 +3,14 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { CONFIG, QUALITY, ID, BLOCKS, ITEMS, CS, H, WATER, isSolidB } from './config.js';
+import { CONFIG, QUALITY, ID, BLOCKS, ITEMS, CS, H, isWater, alturaAgua, isSolidB } from './config.js';
 import { velocidadDeMinado, puedeRecoger, buscarReceta, maxPila } from './objetos.js';
 import { itemSprites } from './textures.js';
 import { renderer, scene, camera, handScene, handCamera, canvas, sun, applyRenderScale, renderScale } from './scene.js';
-import { chunks, chunkKey, savedChunks, heightAt, getBlock, setBlock, updateChunks } from './world.js';
+import { chunks, chunkKey, savedChunks, generateChunk, heightAt, biomeAt, BIOMA_NOMBRE, cabanaEn, esCueva, getBlock, setBlock, updateChunks } from './world.js';
+import { tickAgua, pasoAgua } from './agua.js';
+import { colisiona, moverEje } from './fisica.js';
+import { mobs, TIPOS, spawnMob, actualizarMobs, apuntarMob, golpear, quitar as quitarMob } from './mobs.js';
 import { skyMesh, updateSky, daylight, setTime, skipTime, clockString } from './sky.js';
 import { crackMesh, setCrackStage, hand, startSwing, spawnBreakParticles, updateParticles, updateHand } from './effects.js';
 import { thirdPerson, setThirdPerson, updateCharacter } from './character.js';
@@ -33,30 +36,9 @@ scene.add(highlight);
 const W = 0.3, PH = 1.8, EYE = 1.62;           // medio ancho, alto, altura de los ojos
 const view = { fov: CONFIG.fov, bobPhase: 0, bobAmt: 0, dip: 0 };   // efectos de camara
 
-function collides(px, py, pz) {
-  const x0 = Math.floor(px - W), x1 = Math.floor(px + W - 1e-6);
-  const y0 = Math.floor(py),     y1 = Math.floor(py + PH - 1e-6);
-  const z0 = Math.floor(pz - W), z1 = Math.floor(pz + W - 1e-6);
-  for (let x = x0; x <= x1; x++)
-    for (let y = y0; y <= y1; y++)
-      for (let z = z0; z <= z1; z++)
-        if (isSolidB(getBlock(x, y, z))) return true;
-  return false;
-}
-
-function moveAxis(axis, d) {
-  if (!d) return;
-  const p = player.pos;
-  p[axis] += d;
-  if (!collides(p.x, p.y, p.z)) return;
-  if (axis === 'x') p.x = d > 0 ? Math.floor(p.x + W) - W - 1e-4 : Math.floor(p.x - W) + 1 + W + 1e-4;
-  if (axis === 'z') p.z = d > 0 ? Math.floor(p.z + W) - W - 1e-4 : Math.floor(p.z - W) + 1 + W + 1e-4;
-  if (axis === 'y') {
-    if (d > 0) p.y = Math.floor(p.y + PH) - PH - 1e-4;
-    else { p.y = Math.floor(p.y) + 1 + 1e-4; player.onGround = true; }
-  }
-  player.vel[axis] = 0;
-}
+// La fisica de choque es la de fisica.js (la comparten los mobs); aca solo van las medidas del jugador
+const collides = (px, py, pz) => colisiona(px, py, pz, W, PH);
+const moveAxis = (axis, d) => moverEje(player, axis, d, W, PH);
 
 function physicsStep(dt) {
   const k = keys;
@@ -72,8 +54,8 @@ function physicsStep(dt) {
     while (collides(p.x, p.y, p.z) && p.y < H) p.y += 1;
     player.ajustarSpawn = false; player.fallMax = player.lastY = p.y;
   }
-  const inWater = !player.fly && getBlock(Math.floor(p.x), Math.floor(p.y + 0.4), Math.floor(p.z)) === WATER;
-  const headWater = getBlock(Math.floor(p.x), Math.floor(p.y + 1.6), Math.floor(p.z)) === WATER;
+  const inWater = !player.fly && isWater(getBlock(Math.floor(p.x), Math.floor(p.y + 0.4), Math.floor(p.z)));
+  const headWater = isWater(getBlock(Math.floor(p.x), Math.floor(p.y + 1.6), Math.floor(p.z)));
   player.inWater = inWater; player.headWater = headWater;
 
   const sprint = k.ShiftLeft || k.ShiftRight;
@@ -142,7 +124,7 @@ function raycast(ox, oy, oz, dx, dy, dz, max) {
     else if (tmy < tmz)         { y += sy; t = tmy; tmy += tdy; nx = 0; ny = -sy; nz = 0; }
     else                        { z += sz; t = tmz; tmz += tdz; nx = 0; ny = 0; nz = -sz; }
     if (t > max || y < 0) return null;
-    if (isSolidB(getBlock(x, y, z))) return { x, y, z, nx, ny, nz };
+    if (isSolidB(getBlock(x, y, z))) return { x, y, z, nx, ny, nz, t };
   }
 }
 
@@ -210,6 +192,19 @@ document.addEventListener('pointerlockchange', () => {
 const infoEl = document.getElementById('info');
 const waterEl = document.getElementById('water');
 
+// ---------- Pegarle a un mob ----------
+// Click izquierdo mantenido sobre un mob: un golpe cada 0.5 s. La mano pega 1; una espada, su `danio` (y gasta un uso).
+let mobApuntado = null, ataqueEspera = 0;
+function atacarMob(dt) {
+  ataqueEspera = Math.max(0, ataqueEspera - dt);
+  if (!locked || player.muerto || !mouse.left || !mobApuntado || ataqueEspera > 0) return;
+  const arma = ITEMS[heldId()];
+  golpear(mobApuntado.mob, arma && arma.danio ? arma.danio : 1, player.pos.x, player.pos.z);
+  if (arma && arma.danio) gastarHerramienta();
+  startSwing(); gastar(0.1);
+  ataqueEspera = 0.5;
+}
+
 // ---------- Romper (con grietas) / poner bloques ----------
 let target = null;
 const mining = { x: 0, y: 0, z: 0, p: 0, active: false, delay: 0 };
@@ -252,7 +247,7 @@ function placeBlock() {
   if (!target) return 0.22;
   const px = target.x + target.nx, py = target.y + target.ny, pz = target.z + target.nz;
   const here = getBlock(px, py, pz);
-  if (py < 0 || py >= H || (here !== 0 && here !== WATER)) return;
+  if (py < 0 || py >= H || (here !== 0 && !isWater(here))) return;
   const p = player.pos;       // no poner un bloque dentro del jugador
   if (p.x + W > px && p.x - W < px + 1 && p.y + PH > py && p.y < py + 1 && p.z + W > pz && p.z - W < pz + 1) return;
   setBlock(px, py, pz, id);
@@ -271,6 +266,8 @@ function frame(now) {
 
   renderer.info.reset();
   updateChunks(player.pos.x, player.pos.z, 4, 3, 5);
+  actualizarMobs(locked ? dt : 0);                          // los mobs caminan, aparecen y atacan (en pausa no)
+  tickAgua(locked ? dt : 0);                                // el agua fluye (en pausa no)
 
   if (locked && !player.muerto && chunks.has(chunkKey(Math.floor(player.pos.x / CS), Math.floor(player.pos.z / CS)))) {
     const steps = Math.ceil(dt / (1 / 90));
@@ -302,6 +299,10 @@ function frame(now) {
   updateSky(dt);
 
   target = raycast(eye.x, eye.y, eye.z, d[0], d[1], d[2], CONFIG.reach);
+  mobApuntado = apuntarMob(eye.x, eye.y, eye.z, d[0], d[1], d[2], CONFIG.reachMobs);
+  if (mobApuntado && target && target.t < mobApuntado.t) mobApuntado = null;      // un bloque en el medio tapa al mob
+  if (mobApuntado) target = null;                           // apuntando a un mob no se rompe ni se pone nada detras
+  atacarMob(dt);
   highlight.visible = !!target;
   if (target) highlight.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
 
@@ -316,7 +317,7 @@ function frame(now) {
 
   // bajo el agua: niebla azul y corta, sin cielo
   const cx = Math.floor(camera.position.x), cy = Math.floor(camera.position.y), cz = Math.floor(camera.position.z);
-  const underwater = getBlock(cx, cy, cz) === WATER && camera.position.y < cy + 0.88;
+  const aqui = getBlock(cx, cy, cz), underwater = isWater(aqui) && camera.position.y < cy + (isWater(getBlock(cx, cy + 1, cz)) ? 1 : alturaAgua(aqui));
   waterEl.style.display = underwater ? 'block' : 'none';
   skyMesh.visible = !underwater;
   if (underwater) {
@@ -386,7 +387,7 @@ setTimeout(async () => {
 }, 30);
 
 // Util para experimentar desde la consola (F12)
-window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, guardarAhora: guardarPartida, mundoId, getBlock, setBlock, heightAt, scene, camera, setTime,
+window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, guardarAhora: guardarPartida, mundoId, getBlock, setBlock, generateChunk, heightAt, biomeAt, BIOMA_NOMBRE, cabanaEn, esCueva, pasoAgua, mobs, TIPOS, spawnMob, golpearMob: golpear, quitarMob, apuntarMob, scene, camera, setTime,
               renderer, spawnBreakParticles, hand, mining, startSwing, selectSlot, sun, mouse,
               applyQuality, applyRenderScale, inventory, invAdd, openInventory, closeInventory, setThirdPerson, drops, spawnDrop, setCreative,
               craft, resultadoCraft, ID, ITEMS, itemSprites, buscarReceta, maxPila,

@@ -1,14 +1,15 @@
 // ============================================================
 // world.js - Terreno, chunks y generacion de mallas 3D.
 //   1. Ruido para el terreno      (heightAt)
-//   2. Generacion de un chunk     (generateChunk) con agua y arboles
+//   1b. Biomas, cuevas, minerales y cabañas (biomeAt, esCueva, cabanaEn)
+//   2. Generacion de un chunk     (generateChunk) con agua, arboles, cuevas, minerales y cabañas
 //   3. Acceso a bloques           (getBlock / setBlock)
 //   4. Malla del chunk            (buildChunkMesh): sombreado AO, hojas con huecos, agua
 //   5. Carga/descarga de chunks   (updateChunks)
 // ============================================================
 
 import * as THREE from 'three';
-import { CONFIG, CS, H, BLOCKS, WATER, LEAVES } from './config.js';
+import { CONFIG, CS, H, ID, BLOCKS, WATER, LEAVES, isWater, alturaAgua } from './config.js';
 import { hash2, tileUV, atlasTexture, waterTexture } from './textures.js';
 import { scene, shadow } from './scene.js';
 
@@ -40,6 +41,59 @@ function heightAt(x, z) {
   return Math.min(Math.floor(h), H - 12);
 }
 
+// ---------- 1b. Biomas, cuevas y minerales ----------
+const BIOMA = { LLANURA: 0, BOSQUE: 1, DESIERTO: 2, NEVADO: 3 };
+const BIOMA_NOMBRE = ['Llanura', 'Bosque', 'Desierto', 'Nevado'];
+// Frecuencia relativa de arboles (se multiplica por CONFIG.treeChance): el desierto da cactus y el nevado, pinos
+const K_ARBOL = [0.35, 3, 0.7, 1];
+const LINEA_NIEVE = 47;                    // por encima de esta altura todo es nieve (menos en el desierto)
+
+// Temperatura baja = nevado, alta = desierto; en el medio la humedad separa bosque de llanura
+function biomeAt(x, z) {
+  const seed = CONFIG.seed;
+  const t = fbm(x / 240, z / 240, seed + 300, 2);
+  if (t < 0.385) return BIOMA.NEVADO;
+  if (t > 0.65) return BIOMA.DESIERTO;
+  return fbm(x / 200, z / 200, seed + 400, 2) > 0.5 ? BIOMA.BOSQUE : BIOMA.LLANURA;
+}
+
+// Ruido de valor en 3D (para las cuevas)
+function noise3(x, y, z, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+  const o0 = yi * 7919, o1 = o0 + 7919, p0 = yi * 104729, p1 = p0 + 104729;
+  const a0 = hash2(xi + o0, zi + p0, s), a1 = hash2(xi + 1 + o0, zi + p0, s), a2 = hash2(xi + o0, zi + 1 + p0, s), a3 = hash2(xi + 1 + o0, zi + 1 + p0, s);
+  const b0 = hash2(xi + o1, zi + p1, s), b1 = hash2(xi + 1 + o1, zi + p1, s), b2 = hash2(xi + o1, zi + 1 + p1, s), b3 = hash2(xi + 1 + o1, zi + 1 + p1, s);
+  const a = (a0 + (a1 - a0) * u) + ((a2 + (a3 - a2) * u) - (a0 + (a1 - a0) * u)) * w;
+  const b = (b0 + (b1 - b0) * u) + ((b2 + (b3 - b2) * u) - (b0 + (b1 - b0) * u)) * w;
+  return a + (b - a) * v;
+}
+
+// Tuneles: donde se cruzan dos superficies de ruido 3D queda un tubo (el segundo ruido solo se mira si el primero ya paso)
+const CUEVA_ANCHO = 0.045;
+function esCueva(x, y, z) {
+  const seed = CONFIG.seed;
+  if (Math.abs(noise3(x / 24, y / 15, z / 24, seed + 1001) - 0.5) > CUEVA_ANCHO) return false;
+  return Math.abs(noise3(x / 24, y / 15, z / 24, seed + 1002) - 0.5) < CUEVA_ANCHO * 1.2;
+}
+// Sumideros: pozos angostos que bajan desde la superficie hasta un tunel (la entrada a las cuevas)
+const sumideroNoise = (x, z) => valueNoise(x / 6, z / 6, CONFIG.seed + 1100);
+const esSumidero = (x, z) => sumideroNoise(x, z) > 0.86;
+
+// Cabañas: una celda de 48x48 puede tener una, en un lugar llano y seco. Devuelve { x, z, y } (esquina y altura del piso) o null.
+const CELDA_CABANA = 48;
+function cabanaEn(gx, gz) {
+  const seed = CONFIG.seed;
+  if (hash2(gx, gz, seed + 900) > 0.3) return null;
+  const x = gx * CELDA_CABANA + 4 + Math.floor(hash2(gx, gz, seed + 901) * 36);
+  const z = gz * CELDA_CABANA + 4 + Math.floor(hash2(gx, gz, seed + 902) * 36);
+  const alturas = [[0, 0], [6, 0], [0, 6], [6, 6], [3, 3]].map(([dx, dz]) => heightAt(x + dx, z + dz));
+  const lo = Math.min(...alturas), hi = Math.max(...alturas);
+  if (lo <= CONFIG.seaLevel + 2 || hi - lo > 3 || biomeAt(x + 3, z + 3) === BIOMA.NEVADO) return null;
+  return { x, z, y: hi };
+}
+
 // ---------- 2. Generacion de chunks ----------
 const chunks = new Map();
 const chunkKey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
@@ -52,23 +106,48 @@ function generateChunk(cx, cz) {
   if (saved) return { cx, cz, data: saved.data, maxY: saved.maxY, mesh: null, waterMesh: null, meshed: false, modified: true };
   const data = new Uint8Array(CS * H * CS);
   const ch = { cx, cz, data, maxY: 0, mesh: null, waterMesh: null, meshed: false };
-  const sea = CONFIG.seaLevel;
+  const sea = CONFIG.seaLevel, seed = CONFIG.seed;
 
   for (let z = 0; z < CS; z++) {
     for (let x = 0; x < CS; x++) {
-      const h = heightAt(cx * CS + x, cz * CS + z);
-      const sandy = h <= sea + 1;
+      const wx = cx * CS + x, wz = cz * CS + z;
+      const h = heightAt(wx, wz);
+      const bioma = biomeAt(wx, wz);
+      const sandy = h <= sea + 1 || bioma === BIOMA.DESIERTO;
+      const nieve = !sandy && (bioma === BIOMA.NEVADO || h >= LINEA_NIEVE);
       for (let y = 0; y <= h; y++) {
         let b;
-        if (y === h) b = sandy ? 6 : 1;
+        if (y === h) b = sandy ? 6 : nieve ? ID.NIEVE : 1;
         else if (y >= h - 3) b = sandy ? 6 : 2;
         else b = 3;
         data[y * 256 + z * 16 + x] = b;
       }
       for (let y = h + 1; y <= sea; y++) data[y * 256 + z * 16 + x] = WATER;   // lagos y mar
       ch.maxY = Math.max(ch.maxY, h, h < sea ? sea : 0);
+
+      // cuevas: tuneles bajo la superficie (con 4 bloques de techo, asi no se vacian los lagos) y pozos de entrada
+      for (let y = 3; y <= h - 4; y++) if (esCueva(wx, y, wz)) data[y * 256 + z * 16 + x] = 0;
+      if (h > sea + 1 && esSumidero(wx, wz)) {
+        let fondo = -1;                                                  // el tunel mas cercano, a 12 bloques o menos
+        for (let y = h - 4; y >= h - 12 && y >= 3; y--) if (data[y * 256 + z * 16 + x] === 0) { fondo = y; break; }
+        if (fondo > 0) for (let y = h; y > fondo; y--) data[y * 256 + z * 16 + x] = 0;
+      }
     }
   }
+
+  // Minerales: vetas pequenas en puntos al azar del chunk (siempre los mismos para cada chunk y semilla)
+  let rs = (hash2(cx, cz, seed + 5000) * 4294967296) >>> 0;
+  const azar = () => ((rs = (Math.imul(rs, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const veta = (id, n, ymin, ymax) => {
+    let x = Math.floor(azar() * CS), z = Math.floor(azar() * CS), y = ymin + Math.floor(azar() * (ymax - ymin + 1));
+    for (let i = 0; i < n; i++) {
+      if (x >= 0 && x < CS && z >= 0 && z < CS && y >= 1 && y < H && data[y * 256 + z * 16 + x] === 3) data[y * 256 + z * 16 + x] = id;
+      const r = Math.floor(azar() * 6);
+      if (r < 2) x += r ? 1 : -1; else if (r < 4) z += r === 3 ? 1 : -1; else y += r === 5 ? 1 : -1;
+    }
+  };
+  for (let i = 0; i < 7; i++) veta(ID.MINERAL_HIERRO, 3 + Math.floor(azar() * 5), 4, 44);
+  if (azar() < 0.4) veta(ID.MINERAL_DIAMANTE, 2 + Math.floor(azar() * 3), 3, 14);
 
   // Arboles: se miran las columnas vecinas (+-2) para que las copas crucen bordes de chunk.
   const set = (wx, y, wz, b, force) => {
@@ -77,23 +156,64 @@ function generateChunk(cx, cz) {
     const i = y * 256 + lz * 16 + lx;
     if (force || data[i] === 0) { data[i] = b; if (y > ch.maxY) ch.maxY = y; }
   };
+  const capa = (wx, wz, y, r, esquinas) => {        // capa cuadrada de hojas de radio r (sin esquinas si esquinas = false)
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+      if (!esquinas && r > 0 && Math.abs(dx) === r && Math.abs(dz) === r) continue;
+      set(wx + dx, y, wz + dz, LEAVES, false);
+    }
+  };
+  const maxChance = CONFIG.treeChance * Math.max(...K_ARBOL);
   for (let wz = cz * CS - 2; wz < cz * CS + CS + 2; wz++) {
     for (let wx = cx * CS - 2; wx < cx * CS + CS + 2; wx++) {
-      if (hash2(wx, wz, CONFIG.seed + 777) > CONFIG.treeChance) continue;
+      const r = hash2(wx, wz, seed + 777);
+      if (r > maxChance) continue;
+      const bioma = biomeAt(wx, wz);
+      if (r > CONFIG.treeChance * K_ARBOL[bioma]) continue;
       const gh = heightAt(wx, wz);
-      if (gh <= sea + 1) continue;
-      const top = gh + 4 + Math.floor(hash2(wx, wz, CONFIG.seed + 999) * 2);
-      for (let y = gh + 1; y <= top; y++) set(wx, y, wz, 4, true);
-      for (let y = top - 1; y <= top + 2; y++) {
-        const r = y <= top ? 2 : 1;
-        for (let dx = -r; dx <= r; dx++) {
-          for (let dz = -r; dz <= r; dz++) {
-            if (dx === 0 && dz === 0 && y <= top) continue;
-            if (Math.abs(dx) === r && Math.abs(dz) === r && (r === 2 || y === top + 2)) continue;
-            set(wx + dx, y, wz + dz, LEAVES, false);
+      if (gh <= sea + 1 || esSumidero(wx, wz)) continue;
+      const alea = hash2(wx, wz, seed + 999);
+      if (bioma === BIOMA.DESIERTO) {                                       // cactus
+        const alto = 2 + Math.floor(alea * 3);
+        for (let y = gh + 1; y <= gh + alto; y++) set(wx, y, wz, ID.CACTUS, true);
+      } else if (bioma === BIOMA.NEVADO || gh >= LINEA_NIEVE) {             // pino: tronco alto y copa en cono
+        const top = gh + 6 + Math.floor(alea * 3);
+        for (let y = gh + 1; y <= top; y++) set(wx, y, wz, 4, true);
+        [0, 1, 1, 2, 2, 2].forEach((rad, d) => { if (top + 1 - d >= gh + 3) capa(wx, wz, top + 1 - d, rad, rad === 1 && d !== 1); });
+      } else {
+        const tipo = hash2(wx, wz, seed + 1234);
+        const abedul = tipo < (bioma === BIOMA.BOSQUE ? 0.3 : 0.12), grande = !abedul && bioma === BIOMA.BOSQUE && tipo > 0.82;
+        const tronco = abedul ? ID.ABEDUL : 4;
+        if (grande) {                                                       // roble grande
+          const top = gh + 6 + Math.floor(alea * 2);
+          for (let y = gh + 1; y <= top; y++) set(wx, y, wz, 4, true);
+          [[top - 2, 3], [top - 1, 3], [top, 2], [top + 1, 2], [top + 2, 1], [top + 3, 1]].forEach(([y, rad]) => capa(wx, wz, y, rad, false));
+        } else {
+          const top = gh + (abedul ? 5 : 4) + Math.floor(alea * 2);
+          for (let y = gh + 1; y <= top; y++) set(wx, y, wz, tronco, true);
+          for (let y = top - 1; y <= top + 2; y++) {
+            const rad = y <= top ? 2 : 1;
+            capa(wx, wz, y, rad, !(rad === 2 || y === top + 2));
           }
         }
       }
+    }
+  }
+
+  // Cabañas: piso y techo de tablones, paredes con esquinas de madera, puerta, ventanas y una mesa de crafteo adentro
+  for (let gz = Math.floor((cz * CS - 8) / CELDA_CABANA); gz <= Math.floor((cz * CS + CS + 8) / CELDA_CABANA); gz++) {
+    for (let gx = Math.floor((cx * CS - 8) / CELDA_CABANA); gx <= Math.floor((cx * CS + CS + 8) / CELDA_CABANA); gx++) {
+      const cab = cabanaEn(gx, gz);
+      if (!cab) continue;
+      for (let dz = 0; dz < 7; dz++) for (let dx = 0; dx < 7; dx++) {
+        const wx = cab.x + dx, wz = cab.z + dz, borde = dx === 0 || dx === 6 || dz === 0 || dz === 6, esquina = (dx === 0 || dx === 6) && (dz === 0 || dz === 6);
+        for (let y = heightAt(wx, wz) + 1; y < cab.y; y++) set(wx, y, wz, ID.ADOQUIN, true);   // cimientos hasta el piso
+        set(wx, cab.y, wz, ID.TABLONES, true);
+        for (let y = cab.y + 1; y <= cab.y + 3; y++) set(wx, y, wz, borde ? (esquina ? ID.MADERA : ID.TABLONES) : 0, true);
+        set(wx, cab.y + 4, wz, borde ? ID.ADOQUIN : ID.TABLONES, true);
+        for (let y = cab.y + 5; y <= cab.y + 8; y++) set(wx, y, wz, 0, true);               // despeja arboles y relieve
+      }
+      for (const [dx, dy, dz] of [[3, 1, 6], [3, 2, 6], [0, 2, 3], [6, 2, 3], [3, 2, 0]]) set(cab.x + dx, cab.y + dy, cab.z + dz, 0, true);   // puerta y ventanas
+      set(cab.x + 1, cab.y + 1, cab.z + 1, ID.MESA, true);
     }
   }
   return ch;
@@ -108,7 +228,24 @@ function getBlock(x, y, z) {
   return ch.data[y * 256 + (z & 15) * 16 + (x & 15)];
 }
 
-function setBlock(x, y, z, b) {
+// Agua por revisar (ver agua.js): las coordenadas de las celdas cuyo estado puede haber cambiado
+const activeWater = new Set();
+const waterKey = (x, y, z) => ((x + 1048576) * 2097152 + (z + 1048576)) * 64 + y;
+const VEC7 = [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+function activarAgua(x, y, z) {                     // solo si hay agua en la celda o pegada a ella
+  if (!VEC7.some(([dx, dy, dz]) => isWater(getBlock(x + dx, y + dy, z + dz)))) return;
+  for (const [dx, dy, dz] of VEC7) if (y + dy >= 0 && y + dy < H) activeWater.add(waterKey(x + dx, y + dy, z + dz));
+}
+const chunkLoaded = (x, z) => chunks.has(chunkKey(x >> 4, z >> 4));
+
+// diferir = true: no rehace la malla ahora (la reconstruccion queda pendiente hasta rehacerMallas); lo usa el agua
+const mallasPendientes = new Set();
+function rehacerMallas() {
+  for (const c of mallasPendientes) if (c.meshed && chunks.get(chunkKey(c.cx, c.cz)) === c) buildChunkMesh(c);
+  mallasPendientes.clear();
+}
+
+function setBlock(x, y, z, b, diferir = false) {
   if (y < 0 || y >= H) return;
   const ch = chunks.get(chunkKey(x >> 4, z >> 4));
   if (!ch) return;
@@ -123,8 +260,9 @@ function setBlock(x, y, z, b) {
   if (lz === 0) zs.push(ch.cz - 1); if (lz === 15) zs.push(ch.cz + 1);
   for (const cx of xs) for (const cz of zs) {
     const c = chunks.get(chunkKey(cx, cz));
-    if (c && c.meshed) buildChunkMesh(c);
+    if (c && c.meshed) { if (diferir) mallasPendientes.add(c); else buildChunkMesh(c); }
   }
+  activarAgua(x, y, z);
 }
 
 // ---------- 4. Malla ----------
@@ -182,7 +320,12 @@ function disposeChunkMeshes(ch) {
 const PW = CS + 2, PL = PW * PW;
 const pad = new Uint8Array(PL * (H + 2));
 const OPAQUE = new Uint8Array(256);                    // 1 = tapa las caras vecinas
-for (const k of Object.keys(BLOCKS)) { const b = +k; OPAQUE[b] = (b === LEAVES || b === WATER) ? 0 : 1; }   // todos los bloques tapan, menos hojas y agua
+const IS_WATER = new Uint8Array(256);                  // 1 = agua (fuente o fluyendo)
+for (const k of Object.keys(BLOCKS)) { const b = +k; IS_WATER[b] = isWater(b) ? 1 : 0; OPAQUE[b] = (b === LEAVES || IS_WATER[b]) ? 0 : 1; }   // todos los bloques tapan, menos hojas y agua
+// Luz del cielo: bajo el techo (el bloque opaco mas alto de la columna) oscurece CONFIG.luzPorBloque por bloque, hasta CONFIG.luzMinima. Es lo que hace oscuras las cuevas.
+const LUZ = new Float32Array(80);
+for (let d = 0; d < 80; d++) LUZ[d] = d < 1 ? 1 : Math.max(CONFIG.luzMinima, 1 - CONFIG.luzPorBloque * d);
+const skyY = new Int16Array(PW * PW);                  // por columna del pad: nivel (del pad) del bloque opaco mas alto
 const FACE_OFF = FACES.map(F => F.n[0] + F.n[2] * PW + F.n[1] * PL);
 const FACE_AO = FACES.map(F => F.ao.map(({ s1, s2 }) => {
   const a = s1[0] + s1[2] * PW + s1[1] * PL, b = s2[0] + s2[2] * PW + s2[1] * PL;
@@ -194,7 +337,9 @@ function tileUVs(tile) {
 }
 
 function fillPad(ch) {
-  const top = Math.min(H - 1, ch.maxY + 1);
+  let top = ch.maxY;
+  for (let nz = -1; nz <= 1; nz++) for (let nx = -1; nx <= 1; nx++) { const nc = chunks.get(chunkKey(ch.cx + nx, ch.cz + nz)); if (nc && nc.maxY > top) top = nc.maxY; }
+  top = Math.min(H - 1, top + 1);
   pad.fill(0);
   pad.fill(1, 0, PL);                                  // capa y=-1: el fondo del mundo es solido
   for (let nz = -1; nz <= 1; nz++) {
@@ -211,6 +356,11 @@ function fillPad(ch) {
         }
       }
     }
+  }
+  for (let col = 0; col < PL; col++) {                 // el techo de cada columna: de arriba hacia abajo hasta el primer bloque opaco
+    let y = top + 1;
+    while (y > 0 && !OPAQUE[pad[y * PL + col]]) y--;
+    skyY[col] = y;
   }
 }
 
@@ -251,17 +401,24 @@ function buildChunkMesh(ch) {
         const b = pad[p];
         if (!b) continue;
 
-        if (b === WATER) {                         // ----- agua: solo caras contra aire u hojas
-          const topY = pad[p + PL] === WATER ? 1 : 0.88;
+        if (IS_WATER[b]) {                         // ----- agua: caras contra aire u hojas, y la parte que sobresale de un vecino de agua mas baja
+          const topY = IS_WATER[pad[p + PL]] ? 1 : alturaAgua(b);
           const wx = x0 + x, wz = z0 + z;
+          const dl = skyY[p % PL] - ((p / PL) | 0), lt = dl < 1 ? 1 : LUZ[dl > 79 ? 79 : dl];
           for (let f = 0; f < 6; f++) {
             const nb = pad[p + FACE_OFF[f]];
-            if (nb !== 0 && nb !== LEAVES) continue;
-            if (wvi + 4 > wcap) growWater();
             const F = FACES[f];
-            const br = F.n[1] === 1 ? 1 : F.n[1] === -1 ? 0.6 : 0.8;
+            let y0 = 0;
+            if (IS_WATER[nb]) {
+              if (F.n[1] !== 0) continue;                                       // arriba o abajo hay mas agua
+              const ntop = IS_WATER[pad[p + FACE_OFF[f] + PL]] ? 1 : alturaAgua(nb);
+              if (ntop >= topY - 0.001) continue;                               // el vecino es igual de alto o mas
+              y0 = ntop;
+            } else if (nb !== 0 && nb !== LEAVES) continue;
+            if (wvi + 4 > wcap) growWater();
+            const br = (F.n[1] === 1 ? 1 : F.n[1] === -1 ? 0.6 : 0.8) * lt;
             for (let i = 0; i < 4; i++) {
-              const v = F.v[i], vy = v[1] === 1 ? topY : 0, k = wvi + i;
+              const v = F.v[i], vy = v[1] === 1 ? topY : y0, k = wvi + i;
               wP[k * 3] = x + v[0]; wP[k * 3 + 1] = y + vy; wP[k * 3 + 2] = z + v[2];
               wC[k * 3] = wC[k * 3 + 1] = wC[k * 3 + 2] = br;
               if (F.n[1] !== 0) { wU[k * 2] = wx + v[0]; wU[k * 2 + 1] = wz + v[2]; }
@@ -280,14 +437,15 @@ function buildChunkMesh(ch) {
           const q = p + FACE_OFF[f], nb = pad[q];
           // Las hojas muestran sus caras contra todo lo no opaco; el resto solo contra aire/hojas/agua
           if (leaf) { if (OPAQUE[nb] || (!fancy && nb === LEAVES)) continue; }
-          else if (!(nb === 0 || nb === LEAVES || nb === WATER)) continue;
+          else if (!(nb === 0 || nb === LEAVES || IS_WATER[nb])) continue;
 
           if (vi + 4 > cap) growBuffers();
           const F = FACES[f], A = FACE_AO[f], uv = tileUVs(tiles[F.t]);
           const ao0 = aoLevel(q, A[0]), ao1 = aoLevel(q, A[1]), ao2 = aoLevel(q, A[2]), ao3 = aoLevel(q, A[3]);
           const ao = [ao0, ao1, ao2, ao3];
+          const dl = skyY[q % PL] - ((q / PL) | 0), lt = dl < 1 ? 1 : LUZ[dl > 79 ? 79 : dl];   // luz del cielo en la celda que mira la cara
           for (let i = 0; i < 4; i++) {
-            const v = F.v[i], k = vi + i, br = AO_LEVELS[ao[i]];
+            const v = F.v[i], k = vi + i, br = AO_LEVELS[ao[i]] * lt;
             bP[k * 3] = x + v[0]; bP[k * 3 + 1] = y + v[1]; bP[k * 3 + 2] = z + v[2];
             bN[k * 3] = F.n[0]; bN[k * 3 + 1] = F.n[1]; bN[k * 3 + 2] = F.n[2];
             bC[k * 3] = bC[k * 3 + 1] = bC[k * 3 + 2] = br;
@@ -388,4 +546,5 @@ function updateChunks(px, pz, genBudget, meshBudget, msBudget = 4) {
 // Fuerza a recalcular los radios de carga (lo usa quality.js al cambiar la distancia de vision)
 function resetLoadRadius() { genOffsets = null; }
 
-export { chunks, chunkKey, savedChunks, heightAt, getBlock, setBlock, updateChunks, resetLoadRadius, FACES, QUV, waterMaterial, windUniform };
+export { chunks, chunkKey, savedChunks, generateChunk, heightAt, biomeAt, BIOMA, BIOMA_NOMBRE, esCueva, cabanaEn, getBlock, setBlock, rehacerMallas, activeWater, waterKey, chunkLoaded,
+         updateChunks, resetLoadRadius, FACES, QUV, waterMaterial, windUniform };

@@ -52,6 +52,7 @@ async (filtro = '') => {
       for (let y = PY + 1; y <= PY + 3; y++) if (mc.getBlock(x, y, z) !== 0) mc.setBlock(x, y, z, 0);
     }
     mc.setThirdPerson(false); mc.setCreative(false);
+    mc.CONFIG.mobs = false; mc.mobs.slice().forEach(mc.quitarMob);              // sin mobs que aparezcan solos (las pruebas de mobs los ponen a mano)
     mc.salud.resetear();                                                       // vida, hambre y el cartel de muerte
     if (mc.CONFIG.quality !== 'media') mc.applyQuality('media');
     mc.inventory.fill(null); mc.invAdd(7, 16); mc.invAdd(8, 8); mc.invAdd(9, 8); mc.selectSlot(0);
@@ -289,7 +290,7 @@ async (filtro = '') => {
 
   await prueba('recetas: forma, posicion y espejo', async () => {
     const r = (grilla, ancho) => { const x = mc.buscarReceta(grilla, ancho); return x ? `${x.id}x${x.count}` : null; };
-    const { MADERA: M, TABLONES: T, ADOQUIN: A, PALO: S, MESA, PICO_MADERA, PICO_PIEDRA, HACHA_MADERA, PALA_MADERA, PALA_PIEDRA } = mc.ID;
+    const { MADERA: M, TABLONES: T, ADOQUIN: A, PALO: S, MESA, PICO_MADERA, PICO_PIEDRA, HACHA_MADERA, PALA_MADERA, PALA_PIEDRA, LINGOTE: L, DIAMANTE: D, PICO_HIERRO, PICO_DIAMANTE, PALA_DIAMANTE, ESPADA_MADERA, ESPADA_PIEDRA, ESPADA_DIAMANTE } = mc.ID;
     const esperar_ = (obtenido, esperado, que) => afirmar(obtenido === esperado, `${que}: dio ${obtenido}, se esperaba ${esperado}`);
     esperar_(r([M, 0, 0, 0], 2), `${T}x4`, '1 madera en la esquina de 2x2');
     esperar_(r([0, 0, 0, M], 2), `${T}x4`, '1 madera en otra esquina');
@@ -305,6 +306,13 @@ async (filtro = '') => {
     esperar_(r([0, T, 0, 0, S, 0, 0, S, 0], 3), `${PALA_MADERA}x1`, 'pala');
     esperar_(r([0, A, 0, 0, S, 0, 0, S, 0], 3), `${PALA_PIEDRA}x1`, 'pala de piedra en el medio');
     esperar_(r([T, 0, 0, S, 0, 0, S, 0, 0], 3), `${PALA_MADERA}x1`, 'pala pegada a la izquierda');
+    esperar_(r([L, L, L, 0, S, 0, 0, S, 0], 3), `${PICO_HIERRO}x1`, 'pico de hierro');
+    esperar_(r([D, D, D, 0, S, 0, 0, S, 0], 3), `${PICO_DIAMANTE}x1`, 'pico de diamante');
+    esperar_(r([0, D, 0, 0, S, 0, 0, S, 0], 3), `${PALA_DIAMANTE}x1`, 'pala de diamante');
+    esperar_(r([T, 0, 0, T, 0, 0, S, 0, 0], 3), `${ESPADA_MADERA}x1`, 'espada de madera');
+    esperar_(r([0, 0, A, 0, 0, A, 0, 0, S], 3), `${ESPADA_PIEDRA}x1`, 'espada de piedra pegada a la derecha');
+    esperar_(r([0, D, 0, 0, D, 0, 0, S, 0], 3), `${ESPADA_DIAMANTE}x1`, 'espada de diamante en el medio');
+    esperar_(r([T, 0, 0, T, 0, 0, T, 0, 0], 3), null, 'sin palo no hay espada');
     esperar_(r([T, A, T, 0, S, 0, 0, S, 0], 3), null, 'materiales mezclados');
     esperar_(r([T, T, T, 0, S, 0, 0, 0, 0], 3), null, 'pico incompleto');
     esperar_(r([0, 0, 0, 0], 2), null, 'grilla vacia');
@@ -373,11 +381,420 @@ async (filtro = '') => {
     pestana('todo'); buscar('adoquin');
     afirmar(visibles() === 1, `buscar "adoquin" (sin acento) muestra ${visibles()}, se esperaba 1`);
     buscar('pico');
-    afirmar(visibles() === 2, `buscar "pico" muestra ${visibles()}, se esperaba 2 (de madera y de piedra)`);
+    afirmar(visibles() === 4, `buscar "pico" muestra ${visibles()}, se esperaba 4 (madera, piedra, hierro y diamante)`);
     buscar('zzz');
     afirmar(visibles() === 0, 'buscar algo que no existe deberia mostrar 0');
     buscar(''); afirmar(visibles() === total, 'vaciar el buscador no muestra todo de nuevo');
     tecla('KeyE'); mc.setCreative(false);
+  });
+
+  // ---------------- Fase 3: mundo mas rico ----------------
+  // Chunks generados "en seco" (sin cargarlos en el juego): sirven para mirar el terreno sin viajar
+  const generados = new Map();
+  const generar = (cx, cz) => { const k = cx + ',' + cz; if (!generados.has(k)) generados.set(k, mc.generateChunk(cx, cz)); return generados.get(k); };
+  const bloqueGen = (x, y, z) => generar(Math.floor(x / 16), Math.floor(z / 16)).data[y * 256 + (((z % 16) + 16) % 16) * 16 + (((x % 16) + 16) % 16)];
+  // Cuenta los bloques de cada id en los chunks de un cuadrado de (2r+1)^2 centrado en (cx, cz)
+  const contarChunks = (cx, cz, r) => {
+    const n = {};
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) { const d = generar(cx + dx, cz + dz).data; for (let i = 0; i < d.length; i++) if (d[i]) n[d[i]] = (n[d[i]] || 0) + 1; }
+    return n;
+  };
+
+  await prueba('cuevas: hay tuneles bajo tierra (con techo), y generar un chunk dos veces da lo mismo', async () => {
+    const aire = { n: 0, pasillo: 0, total: 0 };
+    for (let dx = 0; dx < 5; dx++) for (let dz = 0; dz < 5; dz++) {
+      const ch = generar(30 + dx, 30 + dz), d = ch.data;
+      for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+        const h = mc.heightAt((30 + dx) * 16 + x, (30 + dz) * 16 + z);
+        for (let y = 3; y <= h - 4; y++) {
+          aire.total++;
+          if (d[y * 256 + z * 16 + x] === 0) {
+            aire.n++;
+            if (d[(y + 1) * 256 + z * 16 + x] === 0 && d[(y - 1) * 256 + z * 16 + x] !== 0) aire.pasillo++;   // alto como para pararse
+          }
+        }
+      }
+    }
+    const fraccion = aire.n / aire.total;
+    afirmar(fraccion > 0.01 && fraccion < 0.15, `${(fraccion * 100).toFixed(1)}% de lo que hay bajo tierra es aire (se esperaba entre 1% y 15%)`);
+    afirmar(aire.pasillo > 100, `solo ${aire.pasillo} celdas de piso con 2 de alto: los tuneles son muy bajos`);
+    const a = mc.generateChunk(31, 31), b = generar(31, 31);
+    afirmar(a.data.every((v, i) => v === b.data[i]), 'el mismo chunk generado dos veces da distinto');
+    return `${(fraccion * 100).toFixed(1)}% aire, ${aire.pasillo} pisos`;
+  });
+
+  await prueba('cuevas: los lagos no se vacian (el techo de 4 bloques) y las entradas llegan a la superficie', async () => {
+    let lagos = 0, huecosBajoAgua = 0, entradas = 0;
+    for (let dx = 0; dx < 12; dx++) for (let dz = 0; dz < 12; dz++) {
+      const d = generar(20 + dx, 50 + dz).data;
+      for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+        const wx = (20 + dx) * 16 + x, wz = (50 + dz) * 16 + z, h = mc.heightAt(wx, wz);
+        if (h < mc.CONFIG.seaLevel - 1) {                                     // bajo el agua: nada de aire entre el fondo y el agua
+          lagos++;
+          for (let y = h + 1; y <= mc.CONFIG.seaLevel; y++) if (d[y * 256 + z * 16 + x] === 0) huecosBajoAgua++;
+        } else if (h > mc.CONFIG.seaLevel + 1 && d[h * 256 + z * 16 + x] === 0) entradas++;   // pozo que llega a la superficie
+      }
+    }
+    afirmar(lagos > 500, `solo ${lagos} columnas bajo el agua para mirar`);
+    afirmar(huecosBajoAgua === 0, `${huecosBajoAgua} bloques de aire dentro del agua de los lagos`);
+    afirmar(entradas > 0, 'no hay ni un pozo de entrada que llegue a la superficie');
+    return `${entradas} entradas`;
+  });
+
+  await prueba('minerales: hierro y diamante bajo tierra; el diamante solo en lo profundo', async () => {
+    const n = contarChunks(40, 40, 3);
+    const alturaMax = id => { let m = 0; for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { const d = generar(40 + dx, 40 + dz).data; for (let i = 0; i < d.length; i++) if (d[i] === id) m = Math.max(m, i >> 8); } return m; };
+    afirmar((n[mc.ID.MINERAL_HIERRO] || 0) > 100, `solo ${n[mc.ID.MINERAL_HIERRO] || 0} bloques de hierro en 49 chunks`);
+    afirmar((n[mc.ID.MINERAL_DIAMANTE] || 0) > 5, `solo ${n[mc.ID.MINERAL_DIAMANTE] || 0} bloques de diamante en 49 chunks`);
+    afirmar((n[mc.ID.MINERAL_DIAMANTE] || 0) < (n[mc.ID.MINERAL_HIERRO] || 0) / 4, 'el diamante no es mas raro que el hierro');
+    const ydiam = alturaMax(mc.ID.MINERAL_DIAMANTE), yhierro = alturaMax(mc.ID.MINERAL_HIERRO);
+    afirmar(ydiam <= 17, `hay diamante a y=${ydiam} (solo debe haber hasta y=14 y algo de la veta)`);
+    afirmar(yhierro <= 48, `hay hierro a y=${yhierro}`);
+    return `hierro ${n[mc.ID.MINERAL_HIERRO]}, diamante ${n[mc.ID.MINERAL_DIAMANTE]} (y max ${ydiam})`;
+  });
+
+  await prueba('minerales: el hierro pide pico de piedra y el diamante pico de hierro; sin eso no sueltan nada', async () => {
+    await arena();
+    const { MINERAL_HIERRO: HIERRO, MINERAL_DIAMANTE: DIAM, LINGOTE, DIAMANTE, PICO_MADERA, PICO_PIEDRA, PICO_HIERRO } = mc.ID;
+    const con = (pico, mineral) => { mc.inventory[4] = { id: pico, count: 1 }; mc.selectSlot(4); return romperDeEnfrente(mineral); };
+    await con(PICO_MADERA, HIERRO); await dormir(1200);
+    afirmar(cuenta(LINGOTE) === 0 && mc.drops.length === 0, 'el mineral de hierro soltó algo con un pico de madera');
+    await con(PICO_PIEDRA, HIERRO);
+    afirmar(await esperar(() => cuenta(LINGOTE) === 1, 4000), 'el pico de piedra no sacó un lingote del mineral de hierro');
+    await con(PICO_PIEDRA, DIAM); await dormir(1200);
+    afirmar(cuenta(DIAMANTE) === 0 && mc.drops.length === 0, 'el diamante soltó algo con un pico de piedra');
+    const segPiedra = await con(PICO_PIEDRA, DIAM), segHierro = await con(PICO_HIERRO, DIAM);
+    afirmar(await esperar(() => cuenta(DIAMANTE) === 1, 4000), 'el pico de hierro no sacó el diamante');
+    afirmar(segHierro < segPiedra / 2, `el pico de hierro tardó ${segHierro.toFixed(2)} s y el de piedra ${segPiedra.toFixed(2)} s: el de piedra no debería acelerar lo que no puede recoger`);
+    return `diamante: piedra ${segPiedra.toFixed(2)} s, hierro ${segHierro.toFixed(2)} s`;
+  });
+
+  await prueba('biomas: hay llanura, bosque, desierto y nevado, y cada uno tiene su superficie', async () => {
+    const lugar = {};                                                         // un chunk del medio de cada bioma
+    for (let cx = -60; cx <= 60 && Object.keys(lugar).length < 4; cx += 3) for (let cz = -60; cz <= 60; cz += 3) {
+      const b = mc.biomeAt(cx * 16 + 8, cz * 16 + 8);
+      const hc = mc.heightAt(cx * 16 + 8, cz * 16 + 8);
+      if (lugar[b] === undefined && hc > mc.CONFIG.seaLevel + 3 && hc < 44 && [[-3, 0], [3, 0], [0, -3], [0, 3]].every(([dx, dz]) => mc.biomeAt((cx + dx) * 16 + 8, (cz + dz) * 16 + 8) === b)) lugar[b] = [cx, cz];
+    }
+    afirmar(Object.keys(lugar).length === 4, `solo se encontraron los biomas ${Object.keys(lugar).map(k => mc.BIOMA_NOMBRE[k])}`);
+    const tope = (cx, cz) => {                                                // bloque de la superficie de cada columna con tierra firme
+      const n = {};
+      for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+        const h = mc.heightAt(cx * 16 + x, cz * 16 + z);
+        if (h > mc.CONFIG.seaLevel + 1 && h < 47) { const b = generar(cx, cz).data[h * 256 + z * 16 + x]; n[b] = (n[b] || 0) + 1; }
+      }
+      return n;
+    };
+    const [llanura, bosque, desierto, nevado] = [0, 1, 2, 3].map(b => tope(...lugar[b]));
+    const casi = (n, id) => { const total = Object.values(n).reduce((a, b) => a + b, 0); return total > 30 && (n[id] || 0) >= 0.9 * total; };
+    afirmar(casi(llanura, 1) && casi(bosque, 1), 'la llanura y el bosque no tienen césped');
+    afirmar(casi(desierto, 6), `el desierto no es de arena: ${JSON.stringify(desierto)}`);
+    afirmar(casi(nevado, mc.ID.NIEVE), `el nevado no es de nieve: ${JSON.stringify(nevado)}`);
+    const arboles = [0, 1, 2, 3].map(b => contarChunks(lugar[b][0], lugar[b][1], 1));
+    afirmar((arboles[2][mc.ID.CACTUS] || 0) > 0, 'no hay cactus en el desierto');
+    afirmar((arboles[1][mc.ID.ABEDUL] || 0) > 0, 'no hay abedules en el bosque');
+    afirmar((arboles[3][4] || 0) > 0 && (arboles[3][5] || 0) > 0, 'no hay pinos en el nevado');
+    afirmar((arboles[1][4] || 0) > (arboles[0][4] || 0) * 2, `el bosque (${arboles[1][4]} de madera) no tiene bastante mas árboles que la llanura (${arboles[0][4] || 0})`);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (const [cx, cz] of Object.values(lugar)) {          // cada cactus esta en una columna de desierto
+      const ch = generar(cx + dx, cz + dz);
+      for (let i = 0; i < ch.data.length; i++) if (ch.data[i] === mc.ID.CACTUS) {
+        const x = (cx + dx) * 16 + (i & 15), z = (cz + dz) * 16 + ((i >> 4) & 15);
+        afirmar(mc.biomeAt(x, z) === 2, `hay un cactus en (${x}, ${z}) que es ${mc.BIOMA_NOMBRE[mc.biomeAt(x, z)]}`);
+      }
+    }
+    return `chunks de muestra: ${[0, 1, 2, 3].map(b => mc.BIOMA_NOMBRE[b] + ' ' + lugar[b]).join(', ')}`;
+  });
+
+  await prueba('estructuras: una cabaña tiene piso, paredes con esquinas, puerta, ventanas, techo y una mesa de crafteo', async () => {
+    let cab = null;
+    for (let gx = -12; gx <= 12 && !cab; gx++) for (let gz = -12; gz <= 12 && !cab; gz++) cab = mc.cabanaEn(gx, gz);
+    afirmar(cab, 'no hay ninguna cabaña en 25x25 celdas');
+    const { x, y, z } = cab, T = mc.ID.TABLONES;
+    const b = (dx, dy, dz) => bloqueGen(x + dx, y + dy, z + dz);
+    afirmar(b(3, 0, 3) === T && b(1, 0, 5) === T, 'el piso no es de tablones');
+    afirmar(b(0, 1, 1) === T && b(6, 3, 4) === T && b(2, 2, 6) === T, 'las paredes no son de tablones');
+    afirmar(b(0, 1, 0) === mc.ID.MADERA && b(6, 3, 6) === mc.ID.MADERA, 'las esquinas no son de madera');
+    afirmar(b(3, 1, 6) === 0 && b(3, 2, 6) === 0, 'no hay puerta');
+    afirmar(b(0, 2, 3) === 0 && b(6, 2, 3) === 0 && b(3, 2, 0) === 0, 'no hay ventanas');
+    afirmar(b(3, 4, 3) === T && b(0, 4, 0) === mc.ID.ADOQUIN, 'el techo no está');
+    afirmar(b(2, 2, 2) === 0 && b(1, 1, 1) === mc.ID.MESA, 'adentro hay un bloque de más o falta la mesa de crafteo');
+    afirmar(b(3, 5, 3) === 0, 'queda algo encima del techo');
+    return `cabaña en (${x}, ${z}) a y=${y}`;
+  });
+
+  await prueba('luz: bajo un techo se oscurece (por eso las cuevas son oscuras) y al sacarlo vuelve la luz', async () => {
+    await arena();
+    // una columna de piso firme sin nada encima, en el mismo chunk que la plataforma pero fuera de ella
+    const cxv = Math.floor(CX / 16) - 1, czv = Math.floor(CZ / 16);                  // el chunk de al lado de la plataforma
+    afirmar(await esperar(() => { const c = mc.chunks.get(mc.chunkKey(cxv, czv)); return !!(c && c.meshed); }, 15000), 'no se cargó el chunk vecino');
+    const ch = mc.chunks.get(mc.chunkKey(cxv, czv));
+    let sitio = null;
+    for (let lx = 0; lx < 16 && !sitio; lx++) for (let lz = 0; lz < 16 && !sitio; lz++) {
+      const wx = cxv * 16 + lx, wz = czv * 16 + lz;
+      const h = mc.heightAt(wx, wz);
+      if (h < mc.CONFIG.seaLevel + 2 || h > 50 || lx < 2 || lx > 13 || lz < 2 || lz > 13) continue;
+      if (![1, 2, 6, 14].includes(mc.getBlock(wx, h, wz))) continue;
+      let libre = true;
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let y = h; y <= h + 10; y++) if (y > h && mc.getBlock(wx + dx, y, wz + dz) !== 0) libre = false;
+      if (libre && h + 10 < 63) sitio = { wx, wz, h, lx, lz };
+    }
+    afirmar(sitio, 'no se encontró un lugar despejado para la prueba');
+    // brillo (0..1) de los 4 vertices de la cara de arriba del bloque del suelo
+    const brillo = () => {
+      const g = ch.mesh.geometry, pos = g.attributes.position, col = g.attributes.color, nor = g.attributes.normal; let suma = 0, n = 0;
+      for (let i = 0; i < pos.count; i++) {
+        if (nor.getY(i) !== 1 || pos.getY(i) !== sitio.h + 1) continue;
+        if (pos.getX(i) < sitio.lx || pos.getX(i) > sitio.lx + 1 || pos.getZ(i) < sitio.lz || pos.getZ(i) > sitio.lz + 1) continue;
+        suma += col.getX(i); n++;
+      }
+      afirmar(n >= 4, `se encontraron ${n} vértices de la cara de arriba del suelo`);
+      return suma / n;
+    };
+    const abierto = brillo();
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) mc.setBlock(sitio.wx + dx, sitio.h + 9, sitio.wz + dz, 3);   // un techo 8 bloques arriba
+    const tapado = brillo();
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) mc.setBlock(sitio.wx + dx, sitio.h + 9, sitio.wz + dz, 0);
+    const destapado = brillo();
+    afirmar(abierto > 0.5, `al aire libre el brillo es ${abierto.toFixed(2)}`);
+    afirmar(tapado < abierto * 0.99 && tapado < abierto * (mc.CONFIG.luzMinima + 0.2), `con techo el brillo es ${tapado.toFixed(2)}, al aire libre ${abierto.toFixed(2)}: no oscureció lo suficiente`);
+    afirmar(Math.abs(destapado - abierto) < 0.01, `al sacar el techo el brillo es ${destapado.toFixed(2)} y debería volver a ${abierto.toFixed(2)}`);
+    return `aire libre ${abierto.toFixed(2)}, con techo ${tapado.toFixed(2)}`;
+  });
+
+  // ---------------- agua que fluye ----------------
+  const FLUYE = n => 19 + n;                                                    // ids 20..26 = niveles 1..7
+  const esAgua = b => b === 10 || (b >= 20 && b <= 26);
+  const pasosAgua = (max, cond) => { for (let i = 0; i < max; i++) { mc.pasoAgua(); if (cond && cond()) return i + 1; } return max; };
+  // Celdas con agua en un cuadrado de +-r alrededor de (x, z), de la altura y0 para arriba
+  const aguaAlrededor = (x, z, r, y0) => { let n = 0; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) for (let y = y0; y <= PY + 3; y++) if (esAgua(mc.getBlock(x + dx, y, z + dz))) n++; return n; };
+
+  await prueba('agua que fluye: se abre en las 4 direcciones hasta el nivel 7, un bloque en el camino la rodea y sin fuente se seca', async () => {
+    await arena();
+    for (let i = -5; i <= 5; i++) for (const [x, z] of [[CX + i, CZ - 5], [CX + i, CZ + 5], [CX - 5, CZ + i], [CX + 5, CZ + i]]) { mc.setBlock(x, PY + 1, z, 3); mc.setBlock(x, PY + 2, z, 3); }   // un borde para que no se caiga
+    const sx = CX - 4, sz = CZ - 4;                                             // la fuente, en una esquina de la plataforma
+    mc.setBlock(sx, PY + 1, sz, 10);
+    pasosAgua(40);
+    const nivel = (dx, dz) => mc.getBlock(sx + dx, PY + 1, sz + dz);
+    afirmar(nivel(1, 0) === FLUYE(1) && nivel(0, 1) === FLUYE(1), `al lado de la fuente hay ${nivel(1, 0)} y ${nivel(0, 1)}, se esperaba el nivel 1 (20)`);
+    afirmar(nivel(3, 0) === FLUYE(3) && nivel(2, 1) === FLUYE(3), 'a 3 pasos no es el nivel 3');
+    afirmar(nivel(7, 0) === FLUYE(7) && nivel(4, 3) === FLUYE(7), `a 7 pasos hay ${nivel(7, 0)}, se esperaba el nivel 7`);
+    afirmar(nivel(8, 0) === 0 && nivel(8, 1) === 0 && nivel(8, 8) === 0, 'el agua llegó más lejos del nivel 7');
+    // un bloque a 2 de la fuente: el agua lo rodea (5 pasos hasta el otro lado en vez de 3)
+    mc.setBlock(sx + 2, PY + 1, sz, 3);
+    pasosAgua(40);
+    afirmar(nivel(3, 0) === FLUYE(5), `detrás del bloque hay ${nivel(3, 0)}, se esperaba el nivel 5 (rodea el bloque: 5 pasos en vez de 3)`);
+    mc.setBlock(sx + 2, PY + 1, sz, 0);
+    pasosAgua(40);
+    afirmar(nivel(3, 0) === FLUYE(3), 'al sacar el bloque el agua no volvió a acercarse');
+    P.pos.set(sx + 3.5, PY + 1.01, sz + 0.5); P.vel.set(0, 0, 0);                // parado en agua que fluye: se nada igual
+    afirmar(await esperar(() => P.inWater, 2000), 'parado en agua que fluye, el jugador no está en el agua');
+    P.pos.set(CX + 0.5, PY + 1.01, CZ + 4.5); P.vel.set(0, 0, 0);
+    // sacar la fuente seca todo, de a un nivel por paso
+    mc.setBlock(sx, PY + 1, sz, 0);
+    const pasosSeco = pasosAgua(120, () => aguaAlrededor(CX, CZ, 5, PY + 1) === 0);
+    afirmar(aguaAlrededor(CX, CZ, 5, PY + 1) === 0, `quedan ${aguaAlrededor(CX, CZ, 5, PY + 1)} celdas de agua después de 120 pasos`);
+    return `se secó en ${pasosSeco} pasos`;
+  });
+
+  await prueba('agua que fluye: una fuente en el aire cae en cascada, se abre al llegar al suelo y se seca al sacarla', async () => {
+    await arena();
+    const x = CX + 9, z = CZ, g = mc.heightAt(x, z);
+    afirmar(await esperar(() => mc.getBlock(x, g, z) !== 0 && mc.getBlock(x + 1, g, z) !== undefined, 5000), 'no se cargó el suelo');
+    mc.setBlock(x, PY + 1, z, 10);                                              // una fuente colgada del aire
+    pasosAgua(80);
+    afirmar(mc.getBlock(x, PY, z) === FLUYE(1) && mc.getBlock(x, g + 2, z) === FLUYE(1) && mc.getBlock(x, g + 1, z) === FLUYE(1), 'no cae en columna hasta el suelo');
+    const vecinos = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => mc.heightAt(x + dx, z + dz) <= g);
+    afirmar(vecinos.some(([dx, dz]) => mc.getBlock(x + dx, g + 1, z + dz) === FLUYE(2) || mc.heightAt(x + dx, z + dz) < g), 'al llegar al suelo no se abre (nivel 2 al lado)');
+    mc.setBlock(x, PY + 1, z, 0);
+    const pasosSeco = pasosAgua(150, () => aguaAlrededor(x, z, 9, g + 1) === 0);
+    afirmar(aguaAlrededor(x, z, 9, g + 1) === 0, `quedan ${aguaAlrededor(x, z, 9, g + 1)} celdas de agua después de 150 pasos`);
+    return `se secó en ${pasosSeco} pasos`;
+  });
+
+  await prueba('agua que fluye: romper la orilla de un lago deja entrar el agua, y el agua no se pone sola donde no hay fuente', async () => {
+    await arena();
+    const mar = mc.CONFIG.seaLevel, lago = buscarLago();
+    P.pos.set(lago.x + 0.5, mar + 6, lago.z + 0.5); P.vel.set(0, 0, 0);
+    // la orilla: desde el centro del lago, la primera columna que ya no es lago (agua en la anterior, tierra en esta)
+    let orilla = null;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let i = 1; i < 40 && !orilla; i++) {
+      const x = lago.x + dx * i, z = lago.z + dz * i;
+      if (mc.heightAt(x - dx, z - dz) < mar && mc.heightAt(x, z) >= mar) orilla = { x, z, ax: x - dx, az: z - dz };
+    }
+    afirmar(orilla, 'no se encontró la orilla del lago');
+    afirmar(await esperar(() => [[orilla.x, orilla.z], [orilla.ax, orilla.az]].every(([x, z]) => mc.chunks.has(mc.chunkKey(Math.floor(x / 16), Math.floor(z / 16)))), 15000), 'no se cargaron los chunks de la orilla');
+    afirmar(mc.getBlock(orilla.ax, mar, orilla.az) === 10, `junto a la orilla hay ${mc.getBlock(orilla.ax, mar, orilla.az)}, se esperaba agua`);
+    const antes = mc.getBlock(orilla.x, mar, orilla.z);
+    afirmar(antes !== 0 && !esAgua(antes), `la orilla es ${antes}, se esperaba un bloque`);
+    afirmar(mc.getBlock(orilla.x, mar, orilla.z) === antes && !esAgua(mc.getBlock(orilla.x, mar + 1, orilla.z)), 'hay agua arriba de la orilla');
+    mc.setBlock(orilla.x, mar, orilla.z, 0);                                    // se rompe: el agua del lago entra sola, con el reloj del juego
+    afirmar(await esperar(() => mc.getBlock(orilla.x, mar, orilla.z) === FLUYE(1), 4000), `el hueco quedó en ${mc.getBlock(orilla.x, mar, orilla.z)}, se esperaba agua nivel 1 (20)`);
+    mc.setBlock(orilla.x, mar, orilla.z, antes);                                // se tapa de nuevo: el agua que entró no queda colgada
+    await dormir(600);
+    afirmar(mc.getBlock(orilla.x, mar, orilla.z) === antes, 'el bloque de la orilla cambió');
+    // un lago sin tocar no cambia: la superficie sigue siendo una fuente (no se convirtió en agua que fluye)
+    afirmar(mc.getBlock(orilla.ax, mar, orilla.az) === 10, 'la fuente del lago cambió');
+    return `orilla en (${orilla.x}, ${orilla.z})`;
+  });
+
+  // ---------------- Fase 4: mobs ----------------
+  // En las pruebas los mobs no aparecen solos (arena() apaga CONFIG.mobs); se ponen a mano con mc.spawnMob
+  const quietoEn = (tipo, dx, dz, dy = 0) => {                                  // un mob sobre la plataforma, sin pasear
+    const m = mc.spawnMob(tipo, CX + dx + 0.5, PY + 1.01 + dy, CZ + dz + 0.5);
+    m.caminando = false; m.t = 1000;
+    return m;
+  };
+  const caminarHacia = (m, dx, dz) => { m.caminando = true; m.t = 1000; m.dirX = dx; m.dirZ = dz; m.huir = 0; };
+
+  await prueba('mobs: caen al suelo, quedan parados sobre la plataforma y no la atraviesan aunque caigan de alto', async () => {
+    await arena();
+    const cerdo = quietoEn('cerdo', 0, 3, 2), zombi = quietoEn('zombi', 2, 3, 2), vaca = quietoEn('vaca', -2, 3, 2);
+    afirmar(await esperar(() => cerdo.onGround && zombi.onGround && vaca.onGround, 3000), 'no aterrizaron');
+    for (const m of [cerdo, zombi, vaca]) afirmar(cerca(m.pos.y, PY + 1, 0.05), `${m.tipo} quedó en y=${m.pos.y.toFixed(2)}, se esperaba ${PY + 1}`);
+    const alto = mc.spawnMob('vaca', CX + 0.5, PY + 1.01, CZ + 4.5);                  // sobre el borde, y cae desde la altura maxima del mundo
+    alto.pos.y = 63; alto.caminando = false; alto.t = 1000;
+    afirmar(await esperar(() => alto.onGround, 3000), 'la vaca que cae de alto no aterrizó');
+    afirmar(alto.pos.y > PY, `la vaca atravesó la plataforma: y=${alto.pos.y.toFixed(2)}`);
+    [cerdo, zombi, vaca, alto].forEach(mc.quitarMob);
+  });
+
+  await prueba('mobs: caminan hacia donde van, miran hacia ahí y salvan un escalón de 1 bloque pero no uno de 2', async () => {
+    await arena();
+    const a = quietoEn('cerdo', -3, 0), x0 = a.pos.x;
+    afirmar(await esperar(() => a.onGround, 2000), 'el cerdo no aterrizó');
+    caminarHacia(a, 1, 0);
+    await dormir(1500);
+    afirmar(a.pos.x > x0 + 2, `el cerdo caminó solo ${(a.pos.x - x0).toFixed(2)} bloques en 1.5 s (esperado ~2.7)`);
+    afirmar(Math.cos(a.yaw - Math.atan2(-1, 0)) > 0.98, `el cerdo mira hacia ${a.yaw.toFixed(2)} rad, debería mirar a ${Math.atan2(-1, 0).toFixed(2)} (hacia +x, módulo una vuelta)`);
+    // una pared de 1 bloque de alto atravesada de lado a lado: se salta
+    for (let z = CZ - 4; z <= CZ + 4; z++) mc.setBlock(CX + 1, PY + 1, z, 3);
+    a.pos.set(CX - 1.5, PY + 1.01, CZ + 0.5); a.vel.set(0, 0, 0); caminarHacia(a, 1, 0);
+    afirmar(await esperar(() => a.pos.x > CX + 2.2, 3000), `el cerdo no pasó un escalón de 1 bloque (x=${a.pos.x.toFixed(2)})`);
+    // ...y una de 2 no
+    for (let z = CZ - 4; z <= CZ + 4; z++) mc.setBlock(CX + 1, PY + 2, z, 3);
+    a.pos.set(CX - 1.5, PY + 1.01, CZ + 0.5); a.vel.set(0, 0, 0); caminarHacia(a, 1, 0);
+    await dormir(2500);
+    afirmar(a.pos.x < CX + 1 && a.pos.y > PY, `el cerdo atravesó o saltó una pared de 2 bloques (x=${a.pos.x.toFixed(2)}, y=${a.pos.y.toFixed(2)})`);
+    mc.quitarMob(a);
+  });
+
+  await prueba('mobs: el zombi persigue al jugador y le pega 3 puntos por segundo, pero no en creativo', async () => {
+    await arena();
+    mc.setTime(0.75);                                                          // de noche: no se quema
+    const z = quietoEn('zombi', 0, -4);
+    afirmar(await esperar(() => P.vida < 20, 8000), `el zombi no llegó a pegar (distancia ${Math.hypot(z.pos.x - P.pos.x, z.pos.z - P.pos.z).toFixed(1)})`);
+    afirmar(P.vida === 17, `el primer golpe quitó ${20 - P.vida} puntos, se esperaban 3`);
+    afirmar(await esperar(() => P.vida === 14, 2500), `el segundo golpe tardó o no llegó: vida ${P.vida}`);
+    afirmar(Math.hypot(z.pos.x - P.pos.x, z.pos.z - P.pos.z) < 1.6, 'el zombi no se quedó pegado al jugador');
+    mc.salud.resetear(); mc.setCreative(true);
+    await dormir(2500);
+    afirmar(P.vida === 20, `en creativo el zombi quitó vida: ${P.vida}`);
+    mc.setCreative(false); mc.quitarMob(z); mc.setTime(0.25);
+  });
+
+  await prueba('mobs: el zombi se quema de dia si le da el sol, y con techo no', async () => {
+    await arena();
+    mc.setTime(0.25);
+    const al_sol = quietoEn('zombi', 0, -4);
+    al_sol.vida = 5;
+    P.pos.set(CX + 0.5, PY + 1.01, CZ + 4.5);                                  // lejos: no lo persigue (tiene que estar a menos de 24, asi que se queda caminando hacia el jugador)
+    afirmar(await esperar(() => !mc.mobs.includes(al_sol), 5000), `el zombi al sol no murió (vida ${al_sol.vida.toFixed(1)})`);
+    afirmar(mc.drops.length === 0 || mc.drops.every(d => d.id !== mc.ID.LINGOTE), 'el zombi quemado soltó botín');
+    for (let x = CX - 5; x <= CX + 5; x++) for (let zz = CZ - 5; zz <= CZ + 5; zz++) mc.setBlock(x, PY + 3, zz, 3);   // techo sobre toda la plataforma
+    const techo = quietoEn('zombi', 0, -4);
+    P.pos.set(CX + 0.5, PY + 1.01, CZ + 4.5);
+    await dormir(3500);
+    afirmar(mc.mobs.includes(techo) && techo.vida === 20, `el zombi bajo techo se quemó (vida ${techo.vida.toFixed(1)})`);
+    mc.quitarMob(techo);
+  });
+
+  await prueba('mobs: pegarle: la mano saca 1, la espada 5 y gasta un uso; huye, un bloque en el medio lo tapa, y muerto suelta carne', async () => {
+    await arena();
+    const CARNE = mc.ID.CARNE, ESPADA = mc.ID.ESPADA_PIEDRA;
+    const cerdo = quietoEn('cerdo', 0, -2);
+    afirmar(await esperar(() => cerdo.onGround, 2000), 'el cerdo no aterrizó');
+    const enFrente = () => { cerdo.pos.set(CX + 0.5, PY + 1.01, CZ - 1.8); cerdo.vel.set(0, 0, 0); cerdo.huir = 0; cerdo.caminando = false; cerdo.t = 1000; P.yaw = 0; P.pitch = -0.53; };
+    const pegar = async () => { enFrente(); const antes = cerdo.vida; mc.mouse.left = true; const ok = await esperar(() => cerdo.vida !== antes, 1500); mc.mouse.left = false; return ok; };
+    // con la mano
+    mc.selectSlot(8);
+    afirmar(await pegar(), 'el click sobre el cerdo no lo golpeó');
+    afirmar(cerdo.vida === 9, `con la mano el cerdo quedó con ${cerdo.vida}, se esperaba 9`);
+    afirmar(!mc.mining.active && mc.mining.p === 0, 'al golpear al cerdo también se estaba rompiendo el bloque de atrás');
+    afirmar(cerdo.huir > 0 && cerdo.golpe > 0, 'el cerdo no huye ni se pone rojo al golpearlo');
+    afirmar(await esperar(() => Math.hypot(cerdo.vel.x, cerdo.vel.z) > 1, 600), 'el golpe no lo empujó');
+    await dormir(600);
+    // un bloque en el medio lo tapa: no lo golpea (se rompe el bloque, no el cerdo)
+    enFrente(); mc.setBlock(CX, PY + 2, CZ - 1, 3);
+    mc.mouse.left = true; await dormir(400); mc.mouse.left = false;
+    afirmar(cerdo.vida === 9, 'el golpe atravesó un bloque y llegó al cerdo');
+    mc.setBlock(CX, PY + 2, CZ - 1, 0);
+    // con la espada de piedra
+    mc.inventory[4] = { id: ESPADA, count: 1 }; mc.selectSlot(4);
+    await dormir(600);
+    afirmar(await pegar(), 'la espada no golpeó al cerdo');
+    afirmar(cerdo.vida === 4, `con la espada de piedra el cerdo quedó con ${cerdo.vida}, se esperaba 4`);
+    afirmar(mc.inventory[4] && mc.inventory[4].dano === 1, `la espada tiene desgaste ${mc.inventory[4] && mc.inventory[4].dano}, se esperaba 1`);
+    await dormir(600);
+    // el golpe final lo mata: cae de costado, desaparece y suelta carne
+    afirmar(await pegar(), 'el golpe final no llegó');
+    afirmar(cerdo.muriendo > 0 && cerdo.vida <= 0, 'el cerdo no empezó a morir');
+    afirmar(await esperar(() => !mc.mobs.includes(cerdo), 2000), 'el cerdo muerto no desapareció');
+    afirmar(mc.drops.some(d => d.id === CARNE) || cuenta(CARNE) > 0, `no soltó carne: ${JSON.stringify(mc.drops.map(d => d.id))}`);
+  });
+
+  await prueba('mobs: en creativo se pueden golpear pero no sueltan nada; la carne se come', async () => {
+    await arena();
+    mc.setCreative(true);
+    const vaca = quietoEn('vaca', 0, -2);
+    afirmar(await esperar(() => vaca.onGround, 2000), 'la vaca no aterrizó');
+    mc.golpearMob(vaca, 100, P.pos.x, P.pos.z);
+    afirmar(await esperar(() => !mc.mobs.includes(vaca), 2000), 'la vaca no murió');
+    afirmar(mc.drops.length === 0, 'en creativo la vaca soltó algo');
+    mc.setCreative(false);
+    mc.inventory[0] = { id: mc.ID.CARNE, count: 2 }; mc.selectSlot(0);
+    P.hambre = 8; P.pitch = -1; mc.mouse.right = true;
+    afirmar(await esperar(() => cuenta(mc.ID.CARNE) === 1, 2000), 'no comió la carne');
+    mc.mouse.right = false;
+    afirmar(P.hambre === 14, `hambre ${P.hambre}, la carne daba 6 (se esperaba 14)`);
+  });
+
+  await prueba('mobs: aparecen solos cerca del jugador (animales de dia, zombis de noche) y respetan el tope', async () => {
+    await arena();
+    // un lugar con cesped: el medio de un bosque o llanura
+    let sitio = null;
+    for (let cx = -60; cx <= 60 && !sitio; cx += 3) for (let cz = -60; cz <= 60 && !sitio; cz += 3) {
+      const x = cx * 16 + 8, z = cz * 16 + 8, b = mc.biomeAt(x, z), h = mc.heightAt(x, z);
+      if ((b === 0 || b === 1) && h > mc.CONFIG.seaLevel + 3 && h < 44 && [[-3, 0], [3, 0], [0, -3], [0, 3]].every(([dx, dz]) => mc.biomeAt(x + dx * 16, z + dz * 16) === b)) sitio = { x, z, h };
+    }
+    afirmar(sitio, 'no se encontró un lugar con césped');
+    P.pos.set(sitio.x + 0.5, sitio.h + 3, sitio.z + 0.5); P.vel.set(0, 0, 0); P.fallMax = P.lastY = P.pos.y;
+    afirmar(await esperar(() => [...mc.chunks.values()].filter(c => c.meshed).length > 120, 25000), 'no se cargaron los chunks de alrededor');
+    mc.mobs.slice().forEach(mc.quitarMob);
+    mc.CONFIG.mobs = true; mc.CONFIG.maxMobs = 12; mc.setTime(0.25);
+    afirmar(await esperar(() => mc.mobs.some(m => m.def.pasivo), 20000), 'de día no apareció ni un cerdo o vaca en 20 s');
+    afirmar(mc.mobs.every(m => !m.def.hostil), 'de día apareció un zombi');
+    const [cerdo] = mc.mobs;
+    const d = Math.hypot(cerdo.pos.x - P.pos.x, cerdo.pos.z - P.pos.z);
+    afirmar(d > 10 && d < 60, `el animal apareció a ${d.toFixed(1)} bloques del jugador (esperado entre 18 y 44)`);
+    mc.setTime(0.75);                                                          // de noche
+    afirmar(await esperar(() => mc.mobs.some(m => m.def.hostil), 20000), 'de noche no apareció ni un zombi en 20 s');
+    mc.CONFIG.maxMobs = 3; mc.mobs.slice().forEach(mc.quitarMob);
+    await dormir(8000);
+    afirmar(mc.mobs.length <= 3, `hay ${mc.mobs.length} mobs, el tope era 3`);
+    mc.CONFIG.mobs = false; mc.mobs.slice().forEach(mc.quitarMob); mc.CONFIG.maxMobs = 12; mc.setTime(0.25);
+    return `${sitio.x},${sitio.z}`;
+  });
+
+  await prueba('mobs: cada mob se dibuja con 5 mallas y los del mismo tipo comparten la geometria (poco costo por cuadro)', async () => {
+    await arena();
+    const mallas = g => { let n = 0; g.traverse(o => { if (o.isMesh) n++; }); return n; };
+    for (const tipo of ['cerdo', 'vaca', 'zombi']) {
+      const a = quietoEn(tipo, -1, 3), b = quietoEn(tipo, 1, 3);
+      afirmar(mallas(a.grupo) === 5, `el ${tipo} tiene ${mallas(a.grupo)} mallas, se esperaban 5 (cuerpo y 4 miembros)`);
+      afirmar(a.grupo.children[0].geometry === b.grupo.children[0].geometry, `dos ${tipo}s no comparten la geometria del cuerpo`);
+      afirmar(a.mat !== b.mat, 'los dos comparten el material: el destello rojo les pegaria a los dos');
+      mc.quitarMob(a); mc.quitarMob(b);
+    }
   });
 
   // ---------------- inventario ----------------

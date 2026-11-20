@@ -128,7 +128,7 @@ function actualizarSalud(dt) {
 }
 
 // ---------- muerte y reaparicion ----------
-const MENSAJES = { caida: 'Te caíste desde muy alto', hambre: 'Te quedaste sin comida', dano: 'Moriste' };
+const MENSAJES = { caida: 'Te caíste desde muy alto', hambre: 'Te quedaste sin comida', zombi: 'Te mató un zombi', dano: 'Moriste' };
 
 function morir(causa) {
   player.muerto = true;
