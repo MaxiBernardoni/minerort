@@ -58,6 +58,7 @@ async function cargarPartida() {
     try { e = await window.guardado.cargar(mundoId); }
     catch (err) { console.error('[guardado] no se pudo cargar:', err); }
   }
+  if (e && e.danado) toast('No se pudo leer el mundo: se guardó una copia aparte (mundo.danado-...) y empieza uno nuevo');   // guardado-main.js no pisa lo ilegible
   const hayEstado = !!e && e.version === VERSION;
   await cargarMods(hayEstado ? e.mods && e.mods.tabla : null);     // los mods se registran ANTES de leer chunks e inventario (que pueden tener sus ids)
   if (!hayEstado) {
@@ -80,7 +81,7 @@ async function cargarPartida() {
   if (e.spawn) player.spawn = e.spawn;
   const j = e.jugador;
   player.pos.set(j.x, j.y, j.z); player.vel.set(0, 0, 0);
-  player.yaw = j.yaw; player.pitch = j.pitch; player.fly = j.vuela;
+  player.yaw = j.yaw; player.pitch = j.pitch; player.fly = !!j.vuela && creative;     // en supervivencia no se vuela (una partida vieja podia guardarse volando)
   // Salud: una partida de la version anterior no tiene estos campos (arranca llena). Si se cerro el juego en la
   // pantalla de muerte (vida 0), se reaparece en el punto de inicio.
   const hayVida = typeof e.vida === 'number' && e.vida > 0;
@@ -91,6 +92,9 @@ async function cargarPartida() {
   toast('Partida cargada');
   return true;
 }
+
+// Frena todo guardado (lo usa game.js si el mundo no pudo abrirse: un mundo a medio cargar no debe pisar la partida)
+function detenerGuardado() { bloqueado = true; }
 
 // Guarda y vuelve al menu de mundos (recargando la pagina sin parametros)
 async function volverAlMenu() {
@@ -114,4 +118,4 @@ function iniciarGuardado() {
   });
 }
 
-export { mundoId, cargarPartida, guardarPartida, iniciarGuardado, volverAlMenu };
+export { mundoId, cargarPartida, guardarPartida, iniciarGuardado, volverAlMenu, detenerGuardado };

@@ -78,12 +78,13 @@ function destello() {
   requestAnimationFrame(() => requestAnimationFrame(() => { d.style.transition = 'opacity .5s'; d.style.opacity = 0; }));
 }
 
-function danar(n, causa = 'dano') {
+// causa: 'caida' | 'hambre' | 'zombi' | 'mob' | 'dano'. Con 'mob', `quien` es el nombre del mob (sale en el cartel de muerte).
+function danar(n, causa = 'dano', quien = '') {
   if (creative || player.muerto || invulnerable > 0 || n <= 0) return false;
   player.vida = Math.max(0, player.vida - n);
   invulnerable = 0.5;
   destello();
-  if (player.vida <= 0) morir(causa);
+  if (player.vida <= 0) morir(causa, quien);
   return true;
 }
 
@@ -130,11 +131,11 @@ function actualizarSalud(dt) {
 // ---------- muerte y reaparicion ----------
 const MENSAJES = { caida: 'Te caíste desde muy alto', hambre: 'Te quedaste sin comida', zombi: 'Te mató un zombi', dano: 'Moriste' };
 
-function morir(causa) {
+function morir(causa, quien = '') {
   player.muerto = true;
   player.vel.set(0, 0, 0);
   mouse.left = mouse.right = false;
-  el('muerteCausa').textContent = MENSAJES[causa] || MENSAJES.dano;
+  el('muerteCausa').textContent = causa === 'mob' && quien ? 'Te mató: ' + quien : (MENSAJES[causa] || MENSAJES.dano);
   el('muerte').style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock();       // se suelta el mouse para poder apretar el boton
 }

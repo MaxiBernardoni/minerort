@@ -203,7 +203,7 @@ function actualizarMob(m, dt) {
   } else if (def.hostil && dist < 24 && !player.muerto) {                     // persigue al jugador
     wx = dxp / (dist || 1); wz = dzp / (dist || 1); rapidez = def.vel;
     m.ataque -= dt;
-    if (dist < 1.1 && Math.abs(player.pos.y - p.y) < 1.6 && m.ataque <= 0) { danar(def.danio, 'zombi'); m.ataque = 1; }
+    if (dist < 1.1 && Math.abs(player.pos.y - p.y) < 1.6 && m.ataque <= 0) { danar(def.danio, m.tipo === 'zombi' ? 'zombi' : 'mob', def.nombre); m.ataque = 1; }   // los hostiles de mods dicen su nombre en el cartel de muerte
   } else {                                                                    // pasea: un rato quieto, un rato caminando hacia cualquier lado
     m.t -= dt;
     if (m.t <= 0) {
@@ -254,6 +254,7 @@ function actualizarMob(m, dt) {
 }
 
 // ---------- 3. Aparicion ----------
+const SUELO_ANIMALES = [1, 6, ID.NIEVE];                  // cesped (1), arena (6) y nieve: asi tambien hay animales en el desierto y el nevado
 let reloj = 0;
 function intentarAparecer() {
   const vivos = mobs.filter(m => !m.muriendo);
@@ -266,14 +267,14 @@ function intentarAparecer() {
   else if (animales < 6) tipo = elegir(Object.keys(TIPOS).filter(k => TIPOS[k].pasivo));
   else return;
   if (!tipo) return;
-  const ang = Math.random() * Math.PI * 2, r = tipo === 'zombi' ? 14 + Math.random() * 18 : 18 + Math.random() * 26;
+  const ang = Math.random() * Math.PI * 2, r = TIPOS[tipo].hostil ? 14 + Math.random() * 18 : 18 + Math.random() * 26;
   const x = Math.floor(player.pos.x + Math.cos(ang) * r), z = Math.floor(player.pos.z + Math.sin(ang) * r);
   if (!chunkLoaded(x, z)) return;
   for (let y = Math.min(H - 3, heightAt(x, z) + 12); y > 0; y--) {          // la superficie: el primer suelo con 2 de aire arriba
     const b = getBlock(x, y, z);
     if (isWater(b)) return;
     if (isSolidB(b) && b !== LEAVES && getBlock(x, y + 1, z) === 0 && getBlock(x, y + 2, z) === 0) {
-      if (TIPOS[tipo].pasivo && b !== 1) return;                             // los animales, solo sobre cesped
+      if (TIPOS[tipo].pasivo && !SUELO_ANIMALES.includes(b)) return;         // los animales, solo sobre cesped, arena o nieve (no sobre cactus, tablones, etc.)
       spawnMob(tipo, x + 0.5, y + 1.01, z + 0.5);
       return;
     }

@@ -141,6 +141,19 @@ No las pidió Max; salen de lo que le falta al juego frente a Minecraft. Se agre
 - Clima (lluvia, tormentas).
 - Soporte para otros sistemas operativos.
 
+## Arreglos y mejoras técnicas (análisis del 2026-11-20)
+
+Salen de leer el código el 2026-11-20 (no de medir). **Hechos ese día:** volar y cambiar la hora solo en creativo (doble toque de Espacio para volar), el cartel de muerte con el nombre del mob de un mod, animales también en el desierto y el nevado, aviso en pantalla si el arranque falla, y los archivos ilegibles se guardan aparte en vez de pisarse. **Pendientes**, por prioridad:
+
+1. **Guardado incremental:** hoy se reescribe **todo** cada 30 s aunque no haya cambios (`guardado.js` serializa todos los chunks modificados, y `guardado-main.js` hace JSON + base64 + gzip síncronos). Guardar solo si hubo cambios y, más adelante, un archivo por chunk.
+2. **Medir FPS y tiempos** en una PC modesta (el requisito sigue sin medirse) y, según eso, **mover la generación y el mallado de chunks a Web Workers**. Remallar el chunk entero por cada bloque puesto o roto y la basura por cuadro (un array por cara en `buildChunkMesh`, un `Vector3` por cuadro en `frame`) son mejoras chicas.
+3. **El cierre espera 3 s como máximo** al guardar (`main.js`): un guardado grande puede quedar cortado.
+4. **Sin ponerle un bloque encima a un mob:** `placeBlock` solo chequea al jugador, así que se puede encerrar o atrapar a un mob dentro de un bloque (no se probó).
+5. **Menú de opciones y sonido** (ver "Ideas adicionales").
+6. **Una política de contenido (CSP)** en `index.html`, que quizá no sirva mientras los mods corran en la página.
+7. **Contenido que más cambia la sensación de juego:** horno, antorchas y carbón; cultivos y más comida; ovejas y gallinas; creeper y esqueleto; armaduras; cofres; ríos, océanos y lava.
+8. **La prueba inestable:** una corrida de `npm test` dio 91 de 92 y la siguiente 92 de 92 sin cambiar nada; no se supo cuál falló (la salida se recortó con `tail`). En otra corrida falló "mobs: pegarle…" sin relación con lo que se estaba cambiando: es el sospechoso (no confirmado). Guardar siempre la salida completa (`npm test > salida.txt`).
+
 ## Requisito transversal: rendimiento
 
 El juego debe correr bien en cualquier PC (ver [01-vision.md](01-vision.md#requisito-de-rendimiento)). Cada función nueva se evalúa por su costo en FPS. Puntos donde el diseño actual puede dar problemas:
@@ -164,6 +177,8 @@ Mitigaciones posibles cuando haga falta: generar chunks en un `Worker`, limitar 
 | 2026-11-19 | El multijugador usa la opción más factible (propuesta: anfitrión + LAN primero). |
 | 2026-11-19 | *(decidido por la IA, a revisar)* Comida mínima: solo la manzana. Al morir se conserva el inventario. La inanición no mata. |
 | 2026-11-19 | *(decidido por la IA, a revisar)* Varios mundos: cada uno en su carpeta, el menú recarga la página para elegir. |
+| 2026-11-20 | Volar es solo del modo creativo, con **doble toque de Espacio** como en Minecraft (pedido de Max, no la tecla F). |
+| 2026-11-20 | *(decidido por la IA, a revisar)* La tecla **T** (avanzar la hora) también es solo del modo creativo. Los animales aparecen sobre césped, arena y nieve. El cartel de muerte por un mob de un mod dice "Te mató: <nombre>". Un archivo de partida ilegible se mueve a `mundo.danado-<hora>.json.gz` en vez de pisarse. |
 
 ## Preguntas abiertas
 

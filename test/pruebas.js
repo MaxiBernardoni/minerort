@@ -14,6 +14,7 @@ async (filtro = '') => {
   };
   const tecla = (code, abajo = true) => window.dispatchEvent(new KeyboardEvent(abajo ? 'keydown' : 'keyup', { code, bubbles: true }));
   const apretar = async (code, ms) => { tecla(code); await dormir(ms); tecla(code, false); };
+  const dobleEspacio = async (pausa = 80) => { tecla('Space'); tecla('Space', false); await dormir(pausa); tecla('Space'); tecla('Space', false); };   // dos toques seguidos
   const afirmar = (cond, msg) => { if (!cond) throw new Error(msg); };
   const cerca = (a, b, tol) => Math.abs(a - b) <= tol;
   const cuenta = id => mc.inventory.reduce((n, s) => n + (s && s.id === id ? s.count : 0), 0);
@@ -126,14 +127,32 @@ async (filtro = '') => {
     return `se frena en z=${P.pos.z.toFixed(2)}`;
   });
 
-  await prueba('vuela con F y vuelve a caminar', async () => {
+  await prueba('en creativo el doble toque de Espacio vuela y otro doble toque aterriza; un solo toque no vuela', async () => {
     await arena();
+    mc.setCreative(true);
+    await apretar('Space', 150); await dormir(500);                          // un toque solo (salto): no vuela
+    afirmar(!P.fly, 'un solo toque de Espacio activó el vuelo');
+    await dobleEspacio(); afirmar(P.fly, 'el doble toque de Espacio no activó el vuelo');
     const y0 = P.pos.y;
-    tecla('KeyF'); afirmar(P.fly, 'F no activo el vuelo');
     await apretar('Space', 600);
     afirmar(P.pos.y - y0 > 2, `subio solo ${(P.pos.y - y0).toFixed(1)} bloques`);
-    tecla('KeyF'); afirmar(!P.fly, 'F no desactivo el vuelo');
+    await dormir(500);                                                       // pasa el plazo del doble toque
+    await dobleEspacio(); afirmar(!P.fly, 'otro doble toque no desactivó el vuelo');
+    tecla('KeyF'); afirmar(!P.fly, 'la tecla F volvió a activar el vuelo');
     return `subio ${(P.pos.y - y0).toFixed(1)} bloques`;
+  });
+
+  await prueba('en supervivencia el doble toque de Espacio no vuela ni T cambia la hora, y al dejar el creativo volando se aterriza', async () => {
+    await arena();                                                            // arena() deja el modo supervivencia
+    const minutos = () => { const m = el('info').textContent.match(/Hora (\d\d):(\d\d)/); return +m[1] * 60 + +m[2]; };
+    await dobleEspacio(); afirmar(!P.fly, 'el doble toque de Espacio hizo volar en supervivencia');
+    await dormir(600); const antes = minutos();
+    tecla('KeyT'); await dormir(700);
+    const dif = (minutos() - antes + 1440) % 1440;
+    afirmar(dif < 30, `T avanzó la hora ${dif} min en supervivencia (en creativo avanza ~180)`);
+    await dormir(400);
+    mc.setCreative(true); await dobleEspacio(); afirmar(P.fly, 'en creativo el doble toque no activó el vuelo');
+    mc.setCreative(false); afirmar(!P.fly, 'al pasar a supervivencia siguió volando');
   });
 
   await prueba('tercera persona (V) y sombras (G)', async () => {
@@ -785,6 +804,53 @@ async (filtro = '') => {
     return `${sitio.x},${sitio.z}`;
   });
 
+  // Un lugar en el medio de un bioma (los 4 puntos a 48 bloques tambien son de ese bioma), en tierra firme y por debajo de la linea de nieve
+  const sitioDeBioma = bioma => {
+    for (let cx = -60; cx <= 60; cx += 3) for (let cz = -60; cz <= 60; cz += 3) {
+      const x = cx * 16 + 8, z = cz * 16 + 8, h = mc.heightAt(x, z);
+      if (mc.biomeAt(x, z) === bioma && h > mc.CONFIG.seaLevel + 3 && h < 44 && [[-3, 0], [3, 0], [0, -3], [0, 3]].every(([dx, dz]) => mc.biomeAt(x + dx * 16, z + dz * 16) === bioma)) return { x, z, h };
+    }
+    return null;
+  };
+
+  await prueba('mobs: tambien aparecen animales en el desierto (sobre arena) y en el nevado (sobre nieve)', async () => {
+    await arena();
+    const detalle = [];
+    for (const [bioma, nombre, suelos] of [[2, 'desierto', [6]], [3, 'nevado', [mc.ID.NIEVE]]]) {
+      const sitio = sitioDeBioma(bioma);
+      afirmar(sitio, `no se encontró un lugar del bioma ${nombre}`);
+      mc.CONFIG.mobs = false; mc.mobs.slice().forEach(mc.quitarMob);
+      P.pos.set(sitio.x + 0.5, sitio.h + 3, sitio.z + 0.5); P.vel.set(0, 0, 0); P.fallMax = P.lastY = P.pos.y;
+      afirmar(await esperar(() => [...mc.chunks.values()].filter(c => c.meshed).length > 120, 25000), `no se cargaron los chunks del ${nombre}`);
+      mc.CONFIG.maxMobs = 12; mc.setTime(0.25); mc.CONFIG.mobs = true;
+      afirmar(await esperar(() => mc.mobs.some(m => m.def.pasivo), 20000), `en el ${nombre} no apareció ni un animal en 20 s`);
+      const animal = mc.mobs.find(m => m.def.pasivo);
+      const suelo = mc.getBlock(Math.floor(animal.pos.x), Math.floor(animal.pos.y - 0.5), Math.floor(animal.pos.z));
+      afirmar(suelos.includes(suelo), `el animal del ${nombre} está sobre el bloque ${suelo}, se esperaba ${suelos.join(' o ')}`);
+      detalle.push(`${nombre}: ${animal.tipo} sobre ${suelo}`);
+    }
+    mc.CONFIG.mobs = false; mc.mobs.slice().forEach(mc.quitarMob);
+    return detalle.join(', ');
+  });
+
+  await prueba('mobs: el cartel de muerte dice quién te mató: "un zombi" o el nombre del mob de un mod', async () => {
+    await arena();
+    mc.setTime(0.75);                                                          // de noche: el zombi no se quema
+    P.vida = 2;
+    const zombi = quietoEn('zombi', 0, -3);
+    afirmar(await esperar(() => P.muerto, 8000), 'el zombi no mató al jugador');
+    afirmar(el('muerteCausa').textContent === 'Te mató un zombi', `el cartel dice "${el('muerteCausa').textContent}"`);
+    mc.quitarMob(zombi); mc.salud.resetear();
+    mc.TIPOS.golemprueba = { ...mc.TIPOS.zombi, nombre: 'Golem de prueba', mod: true };   // un hostil de mod: otra clave, otro nombre
+    P.vida = 2;
+    const golem = quietoEn('golemprueba', 0, -3);
+    const murio = await esperar(() => P.muerto, 8000);
+    const texto = el('muerteCausa').textContent;
+    mc.quitarMob(golem); delete mc.TIPOS.golemprueba; mc.salud.resetear(); mc.setTime(0.25);
+    afirmar(murio, 'el mob del mod no mató al jugador');
+    afirmar(texto === 'Te mató: Golem de prueba', `el cartel dice "${texto}", se esperaba el nombre del mob del mod`);
+  });
+
   await prueba('mobs: cada mob se dibuja con 5 mallas y los del mismo tipo comparten la geometria (poco costo por cuadro)', async () => {
     await arena();
     const mallas = g => { let n = 0; g.traverse(o => { if (o.isMesh) n++; }); return n; };
@@ -845,8 +911,9 @@ async (filtro = '') => {
   });
 
   // ---------------- cielo y calidad ----------------
-  await prueba('la hora avanza con T y de noche oscurece', async () => {
+  await prueba('en creativo la hora avanza con T y de noche oscurece', async () => {
     await arena();
+    mc.setCreative(true);                                                     // T solo anda en creativo
     const minutos = () => { const m = el('info').textContent.match(/Hora (\d\d):(\d\d)/); return +m[1] * 60 + +m[2]; };
     await dormir(600); const antes = minutos();
     tecla('KeyT'); await dormir(700);

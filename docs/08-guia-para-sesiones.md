@@ -1,6 +1,6 @@
 # 08 · Guía para sesiones: leer, documentar y pensar etapas
 
-> Última revisión: 2026-11-20 (después de los mods). Es para la IA que abre una sesión nueva sin memoria. Corta a propósito: cada sesión gasta contexto, y esto existe para ahorrarlo y para que todas pensemos igual. Lo que ya está en `CLAUDE.md` no se repite acá.
+> Última revisión: 2026-11-20 (después de los mods y de las correcciones del análisis). Es para la IA que abre una sesión nueva sin memoria. Corta a propósito: cada sesión gasta contexto, y esto existe para ahorrarlo y para que todas pensemos igual. Lo que ya está en `CLAUDE.md` no se repite acá.
 
 ## 1. Cómo leer la documentación (gastando poco)
 
@@ -66,4 +66,4 @@
 
 ## 4. Estado al 2026-11-20 (para ubicarse rápido)
 
-Hechas las **Fases 0 a 5 y los mods de la 6** (92 pruebas). **Falta el multijugador**: ya decidido que va primero en **red local**, con un anfitrión y la dependencia `ws` (WebSocket) en el proceso principal; requiere separar el estado del mundo del dibujo y decidir qué hacer con los mods en red. **Es lo más grande del proyecto: preguntas primero.** Otros pendientes importantes: horno y antorchas, guardar los mobs, firmar el instalador, y que Max juegue y revise lo que solo se miró en capturas.
+Hechas las **Fases 0 a 5 y los mods de la 6** (97 pruebas), más las correcciones del análisis del 2026-11-20 (lista de pendientes técnicos en el [roadmap](04-roadmap.md#arreglos-y-mejoras-técnicas-análisis-del-2026-11-20)). **Falta el multijugador**: ya decidido que va primero en **red local**, con un anfitrión y la dependencia `ws` (WebSocket) en el proceso principal; requiere separar el estado del mundo del dibujo y decidir qué hacer con los mods en red. **Es lo más grande del proyecto: preguntas primero.** Otros pendientes importantes: horno y antorchas, guardar los mobs, firmar el instalador, y que Max juegue y revise lo que solo se miró en capturas.

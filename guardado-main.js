@@ -56,9 +56,19 @@ function leer(ruta) {
   return e;
 }
 
-// Devuelve la partida, o null si no hay ninguna (o ninguna se puede leer).
+// Mueve al costado un archivo que no se pudo leer (mundo.danado-<hora>.json.gz) para que el juego, al empezar un mundo
+// nuevo con el mismo id, no lo pise al guardar. Devuelve el nombre nuevo (o null si no se pudo mover).
+function apartar(ruta, avisar) {
+  const destino = ruta.replace(/\.json\.gz$/, '') + '.danado-' + Date.now() + '.json.gz';
+  try { fs.renameSync(ruta, destino); avisar(`[guardado] ${path.basename(ruta)} no se pudo leer: se guardo aparte como ${path.basename(destino)}`); return path.basename(destino); }
+  catch (err) { avisar(`[guardado] no se pudo apartar ${path.basename(ruta)}: ${err.message}`); return null; }
+}
+
+// Devuelve la partida, null si no hay ninguna, o { danado: [nombres] } si habia archivos pero NINGUNO se pudo leer
+// (se apartan en vez de dejar que el juego los pise con un mundo nuevo).
 // Si el archivo principal esta danado prueba con el respaldo.
 function cargar(carpeta, avisar = console.warn) {
+  const ilegibles = [];
   for (const [ruta, esRespaldo] of [[archivo(carpeta), false], [respaldo(carpeta), true]]) {
     if (!fs.existsSync(ruta)) continue;
     try {
@@ -68,9 +78,11 @@ function cargar(carpeta, avisar = console.warn) {
       return estado;
     } catch (err) {
       avisar(`[guardado] no se pudo leer ${path.basename(ruta)}: ${err.message}`);
+      ilegibles.push(ruta);
     }
   }
-  return null;
+  if (!ilegibles.length) return null;
+  return { danado: ilegibles.map(r => apartar(r, avisar)).filter(Boolean) };
 }
 
 // Borra un mundo entero (su carpeta)

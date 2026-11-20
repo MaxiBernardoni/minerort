@@ -253,6 +253,7 @@ function actualizarPaneles() {
 
 function setCreative(v) {
   creative = v;
+  if (!creative) player.fly = false;                       // volar es solo del modo creativo: al pasar a supervivencia se aterriza
   modeBtn.textContent = creative ? 'Modo: Creativo' : 'Modo: Supervivencia';
   actualizarPaneles();
   toast(creative ? 'Modo creativo' : 'Modo supervivencia');

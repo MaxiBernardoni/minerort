@@ -14,7 +14,7 @@ npm run empaquetar # arma el instalador de Windows en dist/ (MiniCraft-Setup-0.1
 
 ## Controles
 
-WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq. mantenido: romper (o pegarle a un mob) · click der.: poner (o comer una manzana, o abrir una mesa de crafteo) · 1-9 o rueda: elegir ranura · E: inventario · F volar · V primera/tercera persona · T avanzar la hora · G sombras · K calidad (alta/media/baja) · Esc pausa · F12 consola
+WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq. mantenido: romper (o pegarle a un mob) · click der.: poner (o comer una manzana, o abrir una mesa de crafteo) · 1-9 o rueda: elegir ranura · E: inventario · doble espacio: volar o aterrizar (solo creativo; en el aire, Espacio sube y Shift baja) · V primera/tercera persona · T avanzar la hora (solo creativo) · G sombras · K calidad (alta/media/baja) · Esc pausa · F12 consola
 
 ## Inventario
 

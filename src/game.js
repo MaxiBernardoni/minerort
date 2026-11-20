@@ -17,13 +17,13 @@ import { skyMesh, updateSky, daylight, setTime, skipTime, clockString } from './
 import { crackMesh, setCrackStage, hand, startSwing, spawnBreakParticles, updateParticles, updateHand } from './effects.js';
 import { thirdPerson, setThirdPerson, updateCharacter } from './character.js';
 import {
-  inventory, craft, resultadoCraft, invAdd, heldId, consumeHeld, gastarHerramienta, selected, selectSlot, invOpen, openInventory, closeInventory,
+  inventory, craft, resultadoCraft, invAdd, heldId, consumeHeld, gastarHerramienta, selected, creative, selectSlot, invOpen, openInventory, closeInventory,
   hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop,
 } from './inventory.js';
 import { player, mouse, lookDir } from './player.js';
 import { applyQuality } from './quality.js';
 import { gastar, comer, alAterrizar, actualizarSalud, resetearSalud, danar, curar, reaparecer } from './salud.js';
-import { mundoId, cargarPartida, guardarPartida, iniciarGuardado } from './guardado.js';
+import { mundoId, cargarPartida, guardarPartida, iniciarGuardado, detenerGuardado } from './guardado.js';
 import { mostrarMenu } from './menu.js';
 
 // Contorno del bloque apuntado
@@ -132,7 +132,7 @@ function raycast(ox, oy, oz, dx, dy, dz, max) {
 
 // ---------- Entrada ----------
 const keys = {};
-let locked = false, placeCooldown = 0;
+let locked = false, placeCooldown = 0, ultimoEspacio = 0;   // ultimoEspacio: cuando se apreto Espacio por ultima vez (para el doble toque que vuela)
 
 window.addEventListener('keydown', e => {
   if (invOpen) {                                              // con el inventario abierto
@@ -143,9 +143,16 @@ window.addEventListener('keydown', e => {
   keys[e.code] = true;
   if (!locked) return;
   if (e.code === 'KeyE') openInventory();
-  if (e.code === 'KeyF') { player.fly = !player.fly; player.vel.y = 0; toast(player.fly ? 'Modo vuelo' : 'Modo caminar'); }
+  if (e.code === 'Space' && !e.repeat && creative) {         // doble toque de espacio: vuela o aterriza (como en Minecraft); solo en creativo
+    const ahora = performance.now();
+    if (ahora - ultimoEspacio < 300) { player.fly = !player.fly; player.vel.y = 0; toast(player.fly ? 'Modo vuelo' : 'Modo caminar'); ultimoEspacio = 0; }
+    else ultimoEspacio = ahora;
+  }
   if (e.code === 'KeyV') { setThirdPerson(!thirdPerson); toast(thirdPerson ? 'Tercera persona' : 'Primera persona'); }
-  if (e.code === 'KeyT') { skipTime(); toast('Hora ' + clockString()); }
+  if (e.code === 'KeyT') {
+    if (!creative) toast('Cambiar la hora es solo del modo creativo');
+    else { skipTime(); toast('Hora ' + clockString()); }
+  }
   if (e.code === 'KeyK') {                                   // cambiar calidad: alta > media > baja
     const names = Object.keys(QUALITY), next = names[(names.indexOf(CONFIG.quality) + 1) % names.length];
     applyQuality(next); toast('Calidad: ' + next);
@@ -372,7 +379,7 @@ function buscarSpawn() {
   return { x: bx + 0.5, y: heightAt(bx, bz) + 1.01, z: bz + 0.5 };
 }
 
-setTimeout(async () => {
+async function arrancar() {
   if (window.guardado && !mundoId) { await mostrarMenu(); return; }   // sin mundo elegido: menu (elegir, crear, borrar); jugar recarga con ?mundo=
   const hayPartida = await cargarPartida();             // antes de generar chunks: puede cambiar la semilla y trae los chunks modificados
   applyQuality(CONFIG.quality);
@@ -390,7 +397,18 @@ setTimeout(async () => {
   document.getElementById('status').textContent = '';
   document.getElementById('playBtn').style.display = 'block';
   requestAnimationFrame(frame);
-}, 30);
+}
+
+// Si algo falla al abrir el mundo (una partida con datos rotos, un mod...) se dice en pantalla en vez de quedar en "Generando mundo..."
+// para siempre. Se frena el guardado: un mundo a medio cargar nunca debe escribirse encima de la partida.
+setTimeout(() => arrancar().catch(err => {
+  console.error('[arranque] no se pudo abrir el mundo:', err);
+  detenerGuardado();
+  document.getElementById('status').textContent = 'No se pudo abrir el mundo: ' + ((err && err.message) || err) + ' (F12 para ver el detalle). Tu partida no se tocó.';
+  document.getElementById('playBtn').style.display = 'none';
+  const volver = document.getElementById('errorBtn');
+  if (window.guardado) { volver.style.display = 'inline-block'; volver.onclick = () => location.assign(location.pathname); }
+}), 30);
 
 // Util para experimentar desde la consola (F12)
 window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, guardarAhora: guardarPartida, mundoId, getBlock, setBlock, generateChunk, heightAt, biomeAt, BIOMA_NOMBRE, cabanaEn, esCueva, pasoAgua, mods: { estado: estadoMods, cargados: modsCargados }, mobs, TIPOS, spawnMob, golpearMob: golpear, quitarMob, apuntarMob, scene, camera, setTime,

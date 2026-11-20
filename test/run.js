@@ -86,6 +86,13 @@ app.whenReady().then(async () => {
       danar(archivoPrincipal); danar(archivoRespaldo);           // 4. los dos danados: mundo nuevo
       await abrirJuego(MUNDO);
       resultados.push(...await ejecutar('pruebas-reinicio.js', 'nuevo'));
+      // Lo ilegible no se pisa: se guarda aparte (mundo.danado-<hora>.json.gz) antes de que el mundo nuevo se escriba encima
+      const apartados = fs.readdirSync(carpetaMundo('prueba')).filter(n => n.includes('.danado-'));
+      resultados.push({
+        nombre: 'sin archivo valido: los dos archivos danados se guardan aparte en vez de pisarse',
+        ok: apartados.length === 2 && apartados.every(n => fs.readFileSync(path.join(carpetaMundo('prueba'), n), 'utf8') === 'esto no es un archivo gzip valido'),
+        detalle: apartados.join(', ') || 'no quedó ninguno',
+      });
       await win.webContents.executeJavaScript('mc.guardarAhora()');         // deja un mundo valido para el menu
 
       // 5. Menu principal y varios mundos. Si un paso falla se anota y se sigue con el siguiente bloque, asi un
@@ -171,6 +178,32 @@ app.whenReady().then(async () => {
         await abrirMenu();
         resultados.push(...await ejecutar('pruebas-mods.js', 'menu'));
       } catch (e) { resultados.push({ nombre: 'mods: cargar, perder y recuperar un mod', ok: false, detalle: e.message }); }
+    }
+
+    // 7. Una partida que se lee bien pero tiene datos rotos (sin "jugador"): al abrirla falla el arranque. Tiene que verse el aviso
+    //    (no quedar en "Generando mundo..." para siempre) y el archivo no se toca (no hay autoguardado de un mundo a medio cargar).
+    if (resultados.some(r => r.nombre.startsWith('guardar:'))) {
+      const errores = erroresConsola.length;                                   // el error de arranque se escribe a proposito en la consola
+      try {
+        escribir(carpetaMundo('roto'), {
+          version: 1, nombre: 'Roto', semilla: 1337, hora: 0.3, creativo: false, seleccionado: 0,
+          inventario: Array(36).fill(null), jugador: null, chunks: [],
+        }, 'roto');
+        const principalRoto = path.join(carpetaMundo('roto'), 'mundo.json.gz');
+        const antes = fs.readFileSync(principalRoto);
+        await abrir('?mundo=roto');
+        await esperarEnPagina("document.getElementById('errorBtn').style.display !== 'none'", 'el aviso de error al abrir un mundo roto');
+        const pagina = await win.webContents.executeJavaScript(
+          `({ estado: document.getElementById('status').textContent, jugar: document.getElementById('playBtn').style.display, chunks: mc.chunks.size })`);
+        await pausa(1500);
+        const despues = fs.readFileSync(principalRoto);
+        resultados.push({
+          nombre: 'arranque: un mundo con datos rotos muestra el aviso y un boton para volver al menu, sin cargarse ni tocar el archivo',
+          ok: /No se pudo abrir el mundo/.test(pagina.estado) && pagina.jugar === 'none' && pagina.chunks === 0 && antes.equals(despues),
+          detalle: `${pagina.estado.slice(0, 90)} · jugar: ${pagina.jugar} · chunks: ${pagina.chunks} · archivo ${antes.equals(despues) ? 'igual' : 'CAMBIO'}`,
+        });
+      } catch (e) { resultados.push({ nombre: 'arranque: un mundo con datos rotos muestra el aviso y un boton para volver al menu, sin cargarse ni tocar el archivo', ok: false, detalle: e.message }); }
+      erroresConsola.length = errores;
     }
 
     resultados.push({

@@ -1,6 +1,6 @@
 # 02 · Estado actual
 
-> Última revisión: 2026-11-20 (después de completar los mods, la mitad de la Fase 6 del roadmap). El código tiene cambios sin commitear desde el commit `76eb7fd` (la Fase 2).
+> Última revisión: 2026-11-20 (después de los mods y de las correcciones del análisis: vuelo solo en creativo, animales en todos los biomas, arranque y guardado más seguros).
 > La lista sale de leer el código y se comprobó con pruebas automáticas (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)). Falta lo que depende de un humano; ver "Pendientes de verificar" al final.
 
 ## Resumen
@@ -17,7 +17,7 @@ npm start
 npm run empaquetar   # arma el instalador de Windows en dist/ (ver "Instalador de Windows")
 ```
 
-`npm test` corre 92 pruebas automáticas en alrededor de un minuto y medio (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)), y `npm run captura` saca capturas del juego para mirar cómo se ve. F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estado del juego (jugador, chunks, inventario, salud, configuración) para experimentar.
+`npm test` corre 97 pruebas automáticas en alrededor de dos minutos (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)), y `npm run captura` saca capturas del juego para mirar cómo se ve. F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estado del juego (jugador, chunks, inventario, salud, configuración) para experimentar.
 
 ## Qué funciona
 
@@ -79,10 +79,10 @@ Tres criaturas dibujadas con cajas de color (sin imágenes), cada una con 5 mall
 | Vaca | 10 | igual que el cerdo | 1 a 3 de carne |
 | Zombi | 20 | **persigue** al jugador a menos de 24 bloques y le pega **3 puntos por segundo** al tocarlo; salta escalones de 1 bloque; **se quema de día** (2 puntos por segundo) si le da el sol, y no si tiene un techo | 15%: un lingote de hierro (quemado, nada) |
 
-- **Aparición:** hasta `CONFIG.maxMobs` (12) vivos a la vez. Cada 0,3 s al principio (después, cada 1,5 s) se intenta un lugar al azar en la superficie, entre 18 y 44 bloques del jugador (los zombis, entre 14 y 32). **Animales:** a cualquier hora, solo sobre césped, hasta 6. **Zombis:** solo de noche (`daylight < 0.4`), hasta 4. Un mob a más de 80 bloques desaparece, y uno sobre un chunk sin cargar espera quieto. `CONFIG.mobs = false` los apaga.
+- **Aparición:** hasta `CONFIG.maxMobs` (12) vivos a la vez. Cada 0,3 s al principio (después, cada 1,5 s) se intenta un lugar al azar en la superficie, entre 18 y 44 bloques del jugador (los zombis, entre 14 y 32). **Animales:** a cualquier hora, solo sobre césped, arena o nieve (así también hay en el desierto y el nevado), hasta 6. **Zombis:** solo de noche (`daylight < 0.4`), hasta 4. Un mob a más de 80 bloques desaparece, y uno sobre un chunk sin cargar espera quieto. `CONFIG.mobs = false` los apaga.
 - **Pegar:** apuntar a un mob a menos de 3,5 bloques (`CONFIG.reachMobs`; un bloque en el medio lo tapa) y mantener el click izquierdo: un golpe cada 0,5 segundos, sin romper el bloque de atrás. La mano pega 1 punto; las **espadas** de madera, piedra, hierro y diamante pegan 4, 5, 6 y 7 (con 59, 131, 250 y 1561 usos; cada golpe gasta uno). El golpe empuja al mob, lo pone rojo un momento y cansa un poco. Al morir se cae de costado y desaparece soltando su botín (en creativo no suelta nada).
 - **Carne:** sale de cerdos y vacas; se come con click derecho y restaura 6 de hambre. Sin horno, se come cruda.
-- **Daño al jugador:** el zombi quita 3 puntos (1,5 corazones) cada 1 segundo cuando está a menos de 1,1 bloques. El cartel dice "Te mató un zombi". En creativo no hace nada.
+- **Daño al jugador:** el zombi quita 3 puntos (1,5 corazones) cada 1 segundo cuando está a menos de 1,1 bloques. El cartel dice "Te mató un zombi" (y, si lo mató un mob hostil de un mod, "Te mató: <nombre del mob>"). En creativo no hace nada.
 - **Los mobs no se guardan en la partida:** al abrir un mundo aparecen otros.
 - **Física:** la misma de `fisica.js` que usa el jugador (cajas contra bloques, gravedad, flotar en el agua), en pasos de 25 ms para que caer rápido no atraviese el piso.
 
@@ -90,7 +90,7 @@ Tres criaturas dibujadas con cajas de color (sin imágenes), cada una con 5 mall
 
 | Función | Detalle |
 |---|---|
-| Movimiento | Caminar, correr (Shift), saltar, nadar, volar (F). Colisiones con bloques. |
+| Movimiento | Caminar, correr (Shift), saltar, nadar, volar (**solo en creativo**: doble toque de Espacio; volando, Espacio sube y Shift baja). Colisiones con bloques. |
 | Cámara | Primera y tercera persona (V). Balanceo al caminar, golpe al aterrizar, FOV más ancho al correr, niebla azul bajo el agua. |
 | Interacción | Romper (click izquierdo mantenido, con grietas progresivas) y poner (click derecho). Alcance de 6 bloques. Contorno negro del bloque apuntado. Apuntando a un mob, el click izquierdo le pega. |
 | Personaje | Cuerpo con cabeza, torso, brazos y piernas. En primera persona se ve el brazo y, en la punta (la mano), el bloque u objeto que sostenés: un cubo para los bloques, un sprite plano para los objetos. |
@@ -175,7 +175,8 @@ Al abrir el juego aparece el **menú principal**:
 - **Cuándo:** automáticamente cada 30 segundos, al cerrar la ventana, al volver al menú, y una vez apenas se crea un mundo (así aparece en el menú desde el primer momento). Al abrir un mundo se retoma donde lo dejaste (aparece "Partida cargada").
 - **Dónde:** en la carpeta de datos de la app, `%APPDATA%\minicraft\mundos\<id>\`, con `mundo.json.gz` (la partida, JSON comprimido), `mundo.respaldo.json.gz` y `meta.json` (nombre, semilla y fechas para el menú). Con un chunk modificado el archivo pesó unos 800 bytes en las pruebas.
 - **Migración:** si había una partida de la versión anterior (`mundo.json.gz` suelto en `%APPDATA%\minicraft\`), el menú la mueve sola a un mundo llamado "Mi mundo".
-- **Si el archivo se daña:** el juego usa el respaldo, que es una copia del estado con el que abriste la partida. Si los dos están dañados, empieza un mundo nuevo sin romperse.
+- **Si el archivo se daña:** el juego usa el respaldo, que es una copia del estado con el que abriste la partida. Si los dos están dañados, **los aparta** (`mundo.danado-<hora>.json.gz` y `mundo.respaldo.danado-<hora>.json.gz`, en la carpeta del mundo, para recuperarlos a mano), avisa en pantalla y empieza un mundo nuevo sin romperse. Antes los pisaba con el mundo nuevo en el primer autoguardado.
+- **Si el mundo se lee bien pero falla al abrirse** (datos rotos, un error en el arranque): la pantalla dice "No se pudo abrir el mundo: …" con el motivo, aparece un botón **Volver al menú**, y **no se guarda nada** encima (el autoguardado nunca llega a arrancar).
 - **Escritura segura:** se escribe un archivo temporal y después se renombra, así un corte a mitad de guardado no deja la partida a medias.
 - **Seguridad:** el identificador de mundo solo admite letras minúsculas, números y guiones (hasta 40), así que la página no puede leer ni borrar archivos fuera de la carpeta de mundos.
 
@@ -233,7 +234,13 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 30. **Los ids de mods son pocos**: 70 bloques (30–99) y 800 objetos (200–999) entre todos los mods, y 43 texturas en el atlas. Si se acaban, el mod que no entra falla con un mensaje.
 31. **Un mod cambia lo que genera el mundo:** un chunk ya generado y guardado no tiene sus minerales, y uno nuevo sí, así que **instalar un mod de generación en un mundo viejo deja costuras** (como cualquier cambio de generador, limitación 8). Quitar uno deja los bloques como "desconocidos".
 
+32. **Un mundo ilegible no se recupera solo.** Si el archivo y su respaldo no se pueden leer, el juego los aparta (ver "Guardado") y empieza un mundo nuevo con el mismo id; si lo abrís desde el menú, la semilla es la de siempre (1337) y no la que tenía el mundo. Recuperar el viejo es a mano. Tampoco se repara una partida con datos rotos: solo se avisa.
+33. **El autoguardado reescribe todo cada 30 segundos**, haya cambios o no (serializa todos los chunks modificados). En un mundo muy construido puede dar tirones y pesa cada vez más. Ver el [roadmap](04-roadmap.md#arreglos-y-mejoras-técnicas-análisis-del-2026-11-20).
+34. **Se puede poner un bloque encima de un mob** (solo se mira que no caiga sobre el jugador): no se probó qué le pasa al mob.
+
 ## Pendientes de verificar
+
+- [ ] **La sensación del doble toque de Espacio para volar** (el plazo entre toques es de 0,3 s, `ultimoEspacio` en `game.js`) y de los animales en el desierto y el nevado. Las pruebas comprueban que ocurren, no que se sientan bien.
 
 El 2026-11-19 se hicieron rondas de pruebas automáticas (detalle en [06-checklist-pruebas.md](06-checklist-pruebas.md)). Max jugó poco y no había visto bugs. Quedan sin probar a mano las cosas que dependen de un humano:
 

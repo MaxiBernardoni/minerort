@@ -1,6 +1,6 @@
 # 03 · Arquitectura
 
-> Última revisión: 2026-11-20 · Corresponde al código después de los mods (Fase 6, primera mitad); antes, las Fases 3 a 5. Hay cambios sin commitear desde `76eb7fd` (la Fase 2).
+> Última revisión: 2026-11-20 · Corresponde al código después de los mods (Fase 6, primera mitad) y de las correcciones del análisis del 2026-11-20 (arranque con `try/catch`, archivos ilegibles apartados, vuelo solo en creativo).
 > Este documento está pensado para dárselo a una IA al empezar una sesión. Los nombres de archivos y funciones salen del código real.
 
 ## Vista general
@@ -79,7 +79,7 @@ config.js ─▶ (nada)
 | `inventory.js` | `inventory`, `craft`, `resultadoCraft`, `invAdd`, `heldId`, `consumeHeld`, `gastarHerramienta`, `selected`, `selectSlot`, `invOpen`, `openInventory(lado)`, `closeInventory`, `toast`, `setCreative`, `drops`, `spawnDrop`, `dropForBlock`, `updateDrops`, … | `config`, `objetos`, `textures`, `scene`, `world`, `sky`, `effects`, `player` |
 | `salud.js` | `danar`, `curar`, `comer`, `gastar`, `alAterrizar`, `actualizarSalud`, `resetearSalud`, `reaparecer`, `MAX` | `config`, `inventory`, `player` |
 | `menu.js` | `mostrarMenu` | — |
-| `guardado.js` | `mundoId`, `cargarPartida`, `guardarPartida`, `iniciarGuardado`, `volverAlMenu` | `config`, `world`, `sky`, `inventory`, `player` |
+| `guardado.js` | `mundoId`, `cargarPartida`, `guardarPartida`, `iniciarGuardado`, `volverAlMenu`, `detenerGuardado` | `config`, `world`, `sky`, `inventory`, `player` |
 | `game.js` | — (es la entrada; arma `window.mc`) | todos |
 
 ## Mapa de archivos
@@ -217,7 +217,7 @@ Todo puro (sin pantalla): se prueba solo.
 - **Modelo:** cajas con color por vértice (`pixelBox` de `effects.js`, como el jugador) **unidas en una sola geometría** (`unir`): cuerpo + cabeza en una malla y cada miembro en otra con su pivote, **5 mallas por mob**. La geometría se arma **una vez por tipo** y se comparte; el **material se clona por mob** (así el destello rojo, `emissive`, no le pega a los demás; no cuesta programas nuevos). Todos miran hacia −Z, como el jugador.
 - **IA** (`actualizarMob`, cada cuadro): `wx, wz` es hacia dónde quiere ir y `rapidez` a cuánto. Un mob que huye (`huir > 0`) se aleja de donde vino el golpe; un hostil a menos de 24 bloques va hacia el jugador y, a menos de 1,1 con la altura parecida, le pega con un enfriamiento de 1 s; si no, pasea (un rato quieto, un rato caminando a un rumbo al azar). Si choca contra un bloque salta (un escalón de 1 sí, de 2 no); si lleva 0,8 s chocando, elige otro rumbo.
 - **Física del mob:** pasos de 25 ms (`pasos = ceil(dt / 0.025)`) con gravedad o flotación en el agua. **Sin pasos cortos, un mob que cae rápido atraviesa un piso de 1 bloque.** Si el chunk de abajo no está cargado, se queda quieto.
-- **Aparición** (`actualizarMobs` → `intentarAparecer`): un intento cada 0,3 s (con menos de 3 mobs) o 1,5 s; elige un punto en un anillo alrededor del jugador, baja desde arriba hasta el primer suelo con 2 de aire y, si es agua, no aparece. Animales solo sobre césped (`id 1`); zombis de noche (`daylight < 0.4`) sobre cualquier suelo. Tope: `CONFIG.maxMobs`.
+- **Aparición** (`actualizarMobs` → `intentarAparecer`): un intento cada 0,3 s (con menos de 3 mobs) o 1,5 s; elige un punto en un anillo alrededor del jugador, baja desde arriba hasta el primer suelo con 2 de aire y, si es agua, no aparece. Animales solo sobre césped (1), arena (6) o nieve (`SUELO_ANIMALES`; nunca sobre cactus, tablones ni hojas); los mobs hostiles (también los de mods) aparecen entre 14 y 32 bloques y los pasivos entre 18 y 44; zombis de noche (`daylight < 0.4`) sobre cualquier suelo. Tope: `CONFIG.maxMobs`.
 - **Sol:** un zombi con `daylight > 0.55` y sin nada sólido encima hasta 24 bloques pierde 2 de vida por segundo (rojo tenue); sin botín.
 - **Combate:** `apuntarMob(origen, dirección, alcance)` prueba el rayo contra la caja de cada mob (método de las "losas") y devuelve el más cercano con su distancia `t`. En `game.js`, `raycast` ahora también devuelve `t` para los bloques: si el bloque está más cerca que el mob, el mob no se puede golpear; y si se apunta a un mob, `target` (el bloque) se descarta para no romper lo de atrás. `atacarMob` golpea cada 0,5 s con el click izquierdo mantenido; `golpear(mob, danio, ox, oz)` resta vida, empuja desde `(ox, oz)`, pone rojo al mob y hace huir a los pasivos; `matar` lo tira de costado 0,4 s, lo quita y suelta el botín con `spawnDrop` (no en creativo).
 - **No se guardan**: la partida no sabe de los mobs.
@@ -291,7 +291,8 @@ Sin `window.guardado` (por ejemplo, en un navegador) no hay menú ni guardado y 
 - **Compatibilidad hacia atrás:** los campos de salud, `spawn` y `nombre` son opcionales. Una partida sin ellos arranca con vida y hambre llenas. Si se cerró el juego en la pantalla de muerte (`vida` 0), se reaparece en el inicio. **Agregar campos opcionales no obliga a subir `VERSION`.** Lo mismo con `itemsV`: una partida sin esa marca viene de antes de los objetos nuevos, cuando la manzana era el id 11 (hoy la mesa de crafteo); al cargarla, `cargarPartida` cambia ese id por `ID.MANZANA` (100) en el inventario.
 - **Cuándo se guarda:** cada 30 segundos, al cerrar la ventana (`main.js` pide guardar y espera `mundo:guardado-listo`, con un tope de 3 segundos; el menú responde enseguida porque no tiene nada que guardar), al volver al menú y una vez al crear un mundo (para que aparezca en la lista desde el primer momento).
 - **Escritura atómica:** se escribe `mundo.json.gz.tmp` y se renombra.
-- **Respaldo:** al cargar bien el archivo principal se copia a `mundo.respaldo.json.gz`. Si el principal está dañado se usa el respaldo, y este no se pisa. Si ninguno sirve, se empieza un mundo nuevo.
+- **Respaldo:** al cargar bien el archivo principal se copia a `mundo.respaldo.json.gz`. Si el principal está dañado se usa el respaldo, y este no se pisa. Si ninguno sirve, `cargar` **aparta** los archivos ilegibles (`apartar`: `mundo.danado-<hora>.json.gz`) y devuelve `{ danado: [nombres] }` en vez de `null`; la página avisa con un cartel y empieza un mundo nuevo, que ya no pisa lo viejo. Si hay archivos legibles y ninguno rotos, devuelve la partida; si no hay archivos, `null`.
+- **Si el arranque falla:** `game.js` (`arrancar()`, envuelto en `.catch`) muestra "No se pudo abrir el mundo: <motivo>" en `#status`, oculta "Click para jugar", muestra `#errorBtn` ("Volver al menú", sin guardar) y llama a `detenerGuardado()`. Un error después de `iniciarGuardado()` también deja de guardar.
 - **Volver al menú:** `volverAlMenu()` guarda, pone `bloqueado = true` (nada vuelve a escribir) y recarga la página sin parámetros.
 - **Si cambiás el formato de forma incompatible:** subir `VERSION` en `src/guardado.js` **y** en `guardado-main.js` (tienen que coincidir). Una versión desconocida se trata como "no hay partida"; para conservar las partidas viejas hay que escribir una migración.
 - **Las pruebas no tocan tus mundos:** `test/run.js` usa una carpeta temporal.
