@@ -41,7 +41,7 @@ Qué implica esta regla:
 
 **Llegar lo más cerca posible de Minecraft**, sin un techo definido. Es un proyecto largo que crece por funciones. Las funciones deseadas hasta hoy están en [04-roadmap.md](04-roadmap.md).
 
-Forma de distribución prevista: **instalador de Windows (.exe)**, para poder pasárselo a otras personas. Hoy solo se corre con `npm start`.
+Forma de distribución prevista: **instalador de Windows (.exe)**, para poder pasárselo a otras personas. Ya existe: `npm run empaquetar` lo arma (ver [02-estado-actual.md](02-estado-actual.md#instalador-de-windows)). Sin firmar, así que Windows avisa al abrirlo.
 
 ## Requisito de rendimiento
 

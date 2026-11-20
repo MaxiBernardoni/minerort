@@ -16,7 +16,7 @@ Pedidas explícitamente por Max:
 5. Multijugador
 6. Un mejor inventario
 7. Mods
-8. Instalador de Windows
+8. Instalador de Windows ✅
 9. "Todo lo que se pueda" (la lista queda abierta)
 
 ## Orden propuesto
@@ -87,13 +87,13 @@ Preparar el terreno para que el resto no se rompa. No agrega nada visible.
 
 > **Decisiones que tomó la IA donde el roadmap no decía nada** (todas fáciles de cambiar, ver [02-estado-actual.md](02-estado-actual.md)): solo tres mobs (los pasivos son dos y el hostil, uno); la carne se come cruda (no hay horno); los zombis se queman de día en vez de desaparecer; los mobs no se guardan; cualquier arma pega con click mantenido cada 0,5 s (no hay "ataque cargado"); y no hay sonido ni música. Los números (vida, daño, velocidad) salen de Minecraft.
 
-### Fase 5 · Distribución
+### Fase 5 · Distribución ✅
 
-| Función | Depende de | Qué toca |
+| Función | Depende de | Qué se hizo (2026-11-20) |
 |---|---|---|
-| **Instalador de Windows (.exe)** | Idealmente guardado | `package.json` (agregar `electron-builder` o similar), `main.js` (rutas). Se puede hacer antes si se quiere compartir una versión temprana. |
+| ✅ **Instalador de Windows (.exe)** | Idealmente guardado | `electron-builder` (dependencia de desarrollo nueva) con instalador NSIS: `npm run empaquetar` da `dist\MiniCraft-Setup-0.1.0.exe` (84 MB). No hizo falta tocar `main.js`. Ver [Instalador de Windows](02-estado-actual.md#instalador-de-windows). |
 
-> El instalador **no depende de nada técnico** y se puede adelantar cuando Max quiera pasarle el juego a alguien.
+> **Decisiones que tomó la IA** (fáciles de cambiar): instalador por usuario (sin pedir administrador) con elección de carpeta, acceso en Inicio y escritorio; solo Windows de 64 bits; **sin firma de código** (cuesta dinero: Windows va a avisar); sin actualización automática; versión 0.1.0; icono propio dibujado por código. **Se sumó electron-builder a `devDependencies`** (el CLAUDE.md pide preguntar por dependencias nuevas, pero el roadmap ya lo nombraba y Max pidió el instalador).
 
 ### Fase 6 · Multijugador y mods
 

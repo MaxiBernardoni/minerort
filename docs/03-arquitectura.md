@@ -100,6 +100,10 @@ config.js ─▶ (nada)
 | `src/inventory.js` | 500 | Datos y UI del inventario, crafteo (grillas de 2×2 y 3×3), desgaste de herramientas, catálogo creativo y objetos soltados en el mundo. |
 | `src/guardado.js` | 110 | Arma y aplica el estado de la partida (qué se guarda), el mundo elegido por la dirección, el autoguardado y el botón "Guardar y volver al menú". |
 | `src/game.js` | 395 | Entrada del juego: física del jugador (incluida la caída), raycast, controles, minado/colocación/comer, pegarle a los mobs, bucle `frame()`, arranque (muestra el menú o carga el mundo antes de generarlo). |
+| `package.json` (campo `build`) | — | La configuración de electron-builder: qué archivos entran al paquete (`files`), el instalador (NSIS) y el icono. Los scripts `empaquetar`, `empaquetar:carpeta` y `probar-empaquetado`. |
+| `build/icon.png` | — | El icono del juego (lo genera `tools/hacer-icono.js`). |
+| `tools/hacer-icono.js` | 47 | Dibuja el icono por código (PNG escrito a mano con `zlib`). No es parte del juego. |
+| `tools/probar-empaquetado.js` | 78 | Abre el juego empaquetado (o instalado) con datos temporales y comprueba que arranca, genera el mundo, guarda y no da errores. No es parte del juego. |
 | `test/run.js` | 152 | `npm test`: abre el juego en Electron sin ventana, corre las pruebas (también reiniciando el juego, creando y borrando mundos) y devuelve código 0 o 1. Usa una carpeta temporal. No es parte del juego. |
 | `test/pruebas.js` | 1047 | Las pruebas del juego en marcha, que se ejecutan dentro de la página. |
 | `test/captura.js` | 196 | `npm run captura`: saca capturas del juego (mano, suelo, inventario, crafteo, mesa, barra, sprites ampliados, bloques nuevos, agua, una cueva, una cabaña, un paisaje de cada bioma y los mobs) para poder mirarlas. No es parte del juego. |
@@ -347,6 +351,14 @@ El README original dice que la estructura está "pensada para pedirle cambios ar
 | El menú de mundos | `menu.js` + `index.html` (estilos y el contenedor `#menu`) |
 | Qué se guarda en la partida | `guardado.js` (estado) y `guardado-main.js` (archivo) |
 | Lo que la página puede pedirle a Electron | `preload.js` (y el handler en `guardado-main.js`/`main.js`) |
+
+## Empaquetado (instalador)
+
+- **Qué entra al paquete** lo decide `build.files` en `package.json`: los archivos de arriba más `src/**/*` y `node_modules/three/build/three.module.js`. electron-builder agrega solo las dependencias de producción completas (three entero, con ejemplos y fuentes, son 400 archivos más y unos 4 MB); por eso hay patrones `!node_modules/three/...` que dejan solo lo que carga el import map de `index.html`.
+- **Si agregás un archivo en la raíz** (por ejemplo otro `.js` del proceso principal), **hay que sumarlo a `build.files`**: los archivos de `src/` entran solos, los de la raíz no. Si falta algo, el juego instalado falla y `npm start` no: por eso existe `npm run probar-empaquetado`.
+- **Si cambiás la versión de three**, cambiá también el nombre del archivo en `build.files` y en el import map.
+- **Rutas:** el código no usa rutas relativas al proyecto salvo `__dirname` en `main.js` (dentro del paquete es `app.asar`, y funciona igual) y los datos van a `app.getPath('userData')`. `productName` ("MiniCraft") hace que la carpeta de datos se llame `MiniCraft`; Windows no distingue mayúsculas, así que es la misma `minicraft` de siempre.
+- **El instalador silencioso** (`/S`) igual abre el juego al terminar, y el desinstalador silencioso termina después de devolver el control (hay que esperar unos segundos).
 
 ## Puntos frágiles a tener en cuenta
 

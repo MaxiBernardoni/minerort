@@ -9,6 +9,7 @@ npm install     # solo la primera vez
 npm start
 npm test        # pruebas automáticas (unos 30 segundos, sin mostrar ventana)
 npm run captura # saca capturas del juego en capturas/ para revisar cómo se ve
+npm run empaquetar # arma el instalador de Windows en dist/ (MiniCraft-Setup-0.1.0.exe)
 ```
 
 ## Controles
@@ -92,6 +93,7 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 | `preload.js` | Puente entre el juego y Electron (solo `window.guardado`) |
 | `guardado-main.js` | Lee y escribe los mundos (una carpeta por mundo) |
 | `test/` | Las pruebas automáticas (`npm test`) y las capturas (`npm run captura`) |
+| `tools/`, `build/` | El icono (`hacer-icono.js` → `icon.png`) y la prueba del juego empaquetado |
 
 ## Rendimiento
 
@@ -99,6 +101,10 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 - Resolución adaptativa: si los FPS caen, el juego baja la resolución solo (y la sube cuando sobra). Se apaga con `adaptiveResolution: false`.
 - Arriba a la izquierda se ve FPS, resolución, llamadas de dibujo y triángulos.
 - Para más FPS: `antialias: false`, bajar `renderDistance` o usar calidad baja. Las sombras son lo más caro.
+
+## Instalador
+
+`npm run empaquetar` arma `dist\MiniCraft-Setup-0.1.0.exe` (unos 84 MB; la primera vez descarga Electron y las herramientas de NSIS). Se instala por usuario, sin administrador, con elección de carpeta y accesos en Inicio y escritorio; el desinstalador no borra los mundos. **No está firmado**: Windows va a avisar al abrirlo ("Más información" → "Ejecutar de todas formas"). `npm run empaquetar:carpeta` arma solo la carpeta sin instalador, y `npm run probar-empaquetado` comprueba que el juego empaquetado arranca, genera el mundo y guarda. Si agregás un archivo en la raíz del proyecto, sumalo a `build.files` en `package.json`.
 
 ## Guardado
 
@@ -118,4 +124,4 @@ La carpeta [`docs/`](docs/README.md) explica el proyecto en detalle: [visión](d
 2. Menú de opciones y más cosas en el menú de mundos (renombrar, duplicar, elegir el modo).
 3. Armaduras y arcos.
 4. Sonidos: pasos, romper, agua, ambiente.
-5. Empaquetar como .exe con electron-builder.
+5. Firmar el instalador, actualización automática y un instalador para otros sistemas.

@@ -1,6 +1,6 @@
 # 02 · Estado actual
 
-> Última revisión: 2026-11-20 (después de completar la Fase 4 del roadmap). El código tiene cambios sin commitear desde el commit `76eb7fd` (la Fase 2).
+> Última revisión: 2026-11-20 (después de completar la Fase 5 del roadmap). El código tiene cambios sin commitear desde el commit `76eb7fd` (la Fase 2).
 > La lista sale de leer el código y se comprobó con pruebas automáticas (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)). Falta lo que depende de un humano; ver "Pendientes de verificar" al final.
 
 ## Resumen
@@ -14,6 +14,7 @@ Tamaño: unas 4.000 líneas entre el juego (`src/`), los archivos de Electron y 
 ```powershell
 npm install   # solo la primera vez
 npm start
+npm run empaquetar   # arma el instalador de Windows en dist/ (ver "Instalador de Windows")
 ```
 
 `npm test` corre 80 pruebas automáticas en alrededor de un minuto (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)), y `npm run captura` saca capturas del juego para mirar cómo se ve. F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estado del juego (jugador, chunks, inventario, salud, configuración) para experimentar.
@@ -137,6 +138,16 @@ Lista completa de teclas en el [README principal](../README.md#controles).
 - **La piedra, el adoquín y el ladrillo solo sueltan algo si los rompés con pico.** Sin pico se rompen pero no dan nada. Con el kit inicial (16 tablones y 8 adoquines) ya se puede fabricar todo lo necesario.
 - Una herramienta no se puede poner como bloque ni comer.
 
+### Instalador de Windows
+
+- **Cómo se arma:** `npm run empaquetar` (electron-builder, instalador NSIS) deja `dist\MiniCraft-Setup-0.1.0.exe` (unos 84 MB; instalado ocupa unos 270 MB, casi todo Electron/Chromium). `npm run empaquetar:carpeta` arma solo la carpeta `dist\win-unpacked` (sin instalador, más rápido). La primera vez descarga Electron y las herramientas de NSIS (internet).
+- **Qué hace al instalar:** pregunta la carpeta (por defecto, en `%LOCALAPPDATA%\Programs`; **no pide administrador**), crea un acceso en el menú Inicio y otro en el escritorio, y abre el juego al terminar. El desinstalador está en "Aplicaciones instaladas" y **no borra tus mundos**: siguen en `%APPDATA%\minicraft\mundos\`.
+- **Mismos mundos que `npm start`:** el juego instalado usa la misma carpeta de datos, así que ve los mundos de la versión de desarrollo.
+- **Qué lleva adentro:** solo el juego (`index.html`, `main.js`, `preload.js`, `guardado-main.js`, `src/`) y `three.module.js`. No lleva pruebas, documentación ni capturas. La lista está en `build.files` de `package.json`.
+- **Icono:** `build/icon.png` (un bloque de césped) lo dibuja `tools/hacer-icono.js` por código; electron-builder lo convierte en `.ico`.
+- **Cómo se prueba:** `npm run probar-empaquetado` (con la carpeta armada) abre el juego empaquetado con una carpeta de datos temporal, comprueba el menú, que se genere el mundo, que guarde en disco y que no haya errores en la consola. Con `MINICRAFT_EXE` se prueba un juego ya instalado.
+- **Sin firmar:** Windows SmartScreen va a mostrar "Windows protegió su PC" al abrir el instalador de otra persona (Más información → Ejecutar de todas formas). Firmarlo requiere un certificado de pago.
+
 ### Mundos y menú principal
 
 Al abrir el juego aparece el **menú principal**:
@@ -178,7 +189,6 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 - Sonido y música.
 - Menú de opciones (el menú principal solo maneja mundos).
 - Mods o extensiones.
-- Instalador de Windows.
 
 ## Limitaciones conocidas (leídas del código)
 
@@ -207,6 +217,8 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 23. **Los mobs no chocan entre sí ni con el jugador**: se superponen.
 24. **Los zombis solo aparecen en la superficie**, no en cuevas ni de día en la sombra (el sol solo los quema, no limita dónde aparecen).
 25. **Los mobs cuestan FPS** (5 mallas por mob, el doble con sombras; 12 mobs son ~60 mallas más) y **no se midió en una PC modesta**. `CONFIG.maxMobs` es la perilla.
+26. **El instalador es solo para Windows de 64 bits, sin firmar y sin actualización automática.** La versión es siempre 0.1.0 (`package.json`): subirla cambia el nombre del instalador. Cada instalación nueva es una copia entera de 270 MB.
+27. **El primer arranque después de armar un .exe nuevo se colgó en esta PC** (sin ningún mensaje, quizá el antivirus revisándolo) y el segundo anduvo siempre. `tools/probar-empaquetado.js` reintenta solo.
 
 ## Pendientes de verificar
 

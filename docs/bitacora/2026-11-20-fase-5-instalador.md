@@ -1,0 +1,32 @@
+# Sesión 2026-11-20 · Fase 5: el instalador de Windows
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** hacer la Fase 5 del roadmap (el instalador). Max lo pidió con *"Segui con la Fase 5, el instalador"*, después de commitear las Fases 3 y 4 (`dc94f3e`).
+- **Prompt(s) clave:** el de arriba. El roadmap decía: `package.json` (agregar `electron-builder` o similar) y `main.js` (rutas).
+- **Resultado:** funcionó. `npm run empaquetar` arma `dist\MiniCraft-Setup-0.1.0.exe` (84 MB). Se probó entero: armarlo, instalarlo en una carpeta, correr el juego instalado y desinstalarlo. `npm test` no cambió (80 de 80: no se tocó el juego). Commit: *(pendiente)*.
+- **Decisiones que tomó la IA** (todas fáciles de cambiar, anotadas en [04-roadmap.md](../04-roadmap.md)):
+  - **electron-builder** como dependencia de desarrollo (el `CLAUDE.md` pide preguntar por las nuevas; el roadmap ya la nombraba y Max pidió el instalador, así que se sumó y se avisa acá).
+  - **Instalador NSIS por usuario:** sin pedir administrador, con elección de carpeta, acceso en Inicio y en el escritorio.
+  - **Sin firma de código** (cuesta un certificado): Windows va a avisar con SmartScreen en otras PC.
+  - **Solo Windows de 64 bits**, sin actualización automática, versión 0.1.0.
+  - **Icono propio** dibujado por código (`tools/hacer-icono.js`), no una imagen externa.
+  - **No hizo falta tocar `main.js`:** los datos ya iban a `app.getPath('userData')` y el HTML carga todo con rutas relativas.
+- **Qué funcionó:**
+  - **Probar el paquete antes de armar el instalador** (`--dir` deja la carpeta con el `.exe` sin instalador, más rápido) con un script propio, `tools/probar-empaquetado.js`: abre el `.exe` con una carpeta de datos temporal, habla con él por el protocolo de depuración de Chromium (el mismo que usa F12), entra a un mundo, espera los chunks, guarda y mira la consola. Sirve igual para el juego ya instalado (`MINICRAFT_EXE`).
+  - **Sabotear el paquete:** sacando `src/mobs.js` de la lista de archivos el juego empaquetado no arranca y la prueba falla con un mensaje claro ("no apareció el menú principal"), mientras `npm start` seguía funcionando. Era el riesgo principal: un archivo que está en el proyecto y no en el paquete.
+  - **Probar el ciclo completo:** instalar en silencio (`/S /D=carpeta`), correr la prueba sobre el juego instalado, desinstalar, y comprobar que se van la carpeta y los accesos y que **quedan los datos** de `%APPDATA%\minicraft`.
+- **Qué falló o hubo que corregir:**
+  - **El paquete llevaba three.js entero** (electron-builder suma las dependencias completas, con ejemplos y fuentes, aunque `files` nombre solo un archivo): 430 archivos en el `.asar`. Se agregaron patrones `!node_modules/three/...` y quedaron 30. Lo vi mirando el contenido del `.asar` (`npx asar list`). **Ojo con el efecto:** la carpeta bajó de 274 a 270 MB, solo 4 MB; el peso (~270 MB instalado, 84 MB el instalador) es Electron/Chromium, y no hay mucho que hacer.
+  - **El primer arranque después de armar un `.exe` nuevo se colgó, sin ningún mensaje**, tres veces seguidas, y el segundo siempre anduvo. Lo primero que pensé fue un error del paquete y no lo era: matando el proceso y reintentando andaba igual. Probablemente el antivirus revisando un `.exe` nuevo. El script reintenta solo (hasta 3 veces, 25 s cada una).
+  - **El instalador en silencio abre el juego al terminar** (también con `/S`), y esa ventana usó los **mundos reales de Max** (solo se abrió el menú; no se creó ni tocó ningún mundo, pero fue una sorpresa mía). Se cerró enseguida. Quedó escrito en el `CLAUDE.md`: no instalar ni abrir el `.exe` instalado de verdad sin avisar.
+  - Mi primer intento de reintento en el script falló por comillas del shell (`${…}` dentro de un `node -e`); lo rehice con una edición directa.
+- **Lección:** **cuando el riesgo es "funciona acá y no en otro lado", la prueba tiene que correr sobre el resultado final, no sobre el código.** `npm test` pasa con el juego sin empaquetar; lo que se puede romper es qué entra al paquete. Y los síntomas de arranque sin ningún mensaje conviene reintentarlos una vez antes de buscar un bug.
+- **Quedó pendiente:**
+  - [ ] **Commitear** (incluye `package-lock.json`, que cambió por electron-builder).
+  - [ ] **Probar el instalador con el mouse** (las pantallas del asistente: elegir carpeta, accesos). Solo se probó en silencio.
+  - [ ] **Probarlo en otra PC**, sin Node ni nada del proyecto instalado: es la prueba que importa y es de Max. Esperá el aviso de SmartScreen (y quizá del antivirus).
+  - [ ] **Firmar el instalador** si se va a repartir (certificado de código; sin eso el aviso de Windows no desaparece).
+  - [ ] **Versión:** hoy 0.1.0 siempre; conviene subirla en `package.json` cuando se reparta una.
+  - [ ] **Actualización automática**, **un instalador para otros sistemas** y una **política de contenido (CSP)** en el HTML (Electron avisa que falta; conviene resolverlo antes de repartirlo y de los mods).
+  - [ ] `npm audit` marca avisos en dependencias de desarrollo de electron-builder; no entran al juego instalado, pero no se revisaron.
+  - [ ] **Fase 6** (multijugador y mods), la última del roadmap.

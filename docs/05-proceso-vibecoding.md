@@ -101,3 +101,4 @@ Ver la carpeta [`bitacora/`](bitacora/). Sesiones registradas hasta ahora:
 - [2026-11-20 · Fase 2 completa: objetos, crafteo y herramientas](bitacora/2026-11-20-fase-2-completa.md)
 - [2026-11-20 · Fase 3 completa: cuevas, minerales, biomas, agua que fluye y cabañas](bitacora/2026-11-20-fase-3-completa.md)
 - [2026-11-20 · Fase 4 completa: mobs y combate](bitacora/2026-11-20-fase-4-completa.md)
+- [2026-11-20 · Fase 5: el instalador de Windows](bitacora/2026-11-20-fase-5-instalador.md)

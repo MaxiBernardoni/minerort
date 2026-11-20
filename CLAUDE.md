@@ -30,7 +30,9 @@ Clon de Minecraft en Electron + Three.js, hecho como experimento de aprendizaje 
 npm install    # solo la primera vez
 npm start      # jugar
 npm test       # las pruebas automáticas (≈30 s, sin mostrar ventana); `npm test -- hora` corre solo algunas
-npm run captura   # saca PNG del juego en capturas/ (mano, suelo, inventario, crafteo, mesa, barra, sprites) para MIRARLOS
+npm run captura   # saca PNG del juego en capturas/ (mano, suelo, inventario, crafteo, mesa, barra, sprites, mobs, biomas…) para MIRARLOS
+npm run empaquetar          # arma el instalador de Windows (dist/MiniCraft-Setup-0.1.0.exe, ~84 MB; dist/ no se commitea)
+npm run empaquetar:carpeta  # solo la carpeta dist/win-unpacked (mas rapido) y despues: npm run probar-empaquetado
 ```
 
 F12 abre la consola. `window.mc` expone el estado del juego.
@@ -60,6 +62,7 @@ F12 abre la consola. `window.mc` expone el estado del juego.
 - La generación de chunks corre en el hilo principal.
 - `npm test` cubre la lógica pero **no ve el aspecto** (colores, texturas, sombras), ni el mouse real, ni el rendimiento en una PC modesta.
 - **Si cambiás algo visual** (modelos, texturas, la mano, la interfaz), corré `npm run captura` y **mirá los PNG de `capturas/`** (con la herramienta de leer archivos, que muestra imágenes) antes de decir que quedó bien. Un bloque a mitad del brazo y una manzana cúbica pasaron inadvertidos porque nadie miró. Si no pudiste mirarlo, decilo en vez de afirmar que se ve bien.
+- **El instalador** (Fase 5, electron-builder, configuración en `build` de `package.json`) solo lleva lo que dice `build.files`: `src/**` entra solo, **un archivo nuevo en la raíz hay que sumarlo ahí**, y si no, el juego instalado falla y `npm start` no. Después de tocar el empaquetado o agregar archivos en la raíz, corré `npm run empaquetar:carpeta` y `npm run probar-empaquetado` (la ventana se ve unos segundos; usa datos temporales, no toca los mundos de Max). **No instales ni abras el .exe instalado de verdad sin avisar**: el instalador silencioso abre el juego con los mundos reales de Max. `electron-builder` es una dependencia de desarrollo aprobada por el pedido de la Fase 5.
 - **La física de choque es compartida** (`fisica.js`: `colisiona`, `moverEje`): el jugador (`game.js`) y los mobs (`mobs.js`) la usan. Un cuerpo es cualquier objeto con `pos`, `vel` y `onGround`; el ancho y el alto se pasan en cada llamada. `CONFIG.mobs` apaga los mobs y `mc.spawnMob(tipo, x, y, z)` pone uno a mano; las pruebas apagan los mobs en `arena()` para no depender del azar.
 - **El agua tiene 8 ids** (10 = fuente, 20–26 = fluyendo): preguntá siempre `isWater(b)`, nunca `b === WATER`. Cambiar un bloque junto al agua la hace fluir (`agua.js`); `mc.pasoAgua()` avanza un paso en las pruebas. El generador de terreno (biomas, cuevas, minerales, árboles, cabañas) está en `world.js`: un cambio ahí deja costuras en los mundos viejos y obliga a revisar las pruebas `cuevas`, `minerales`, `biomas` y `estructuras`.
 - **Bloques y objetos son dos registros:** `BLOCKS` (ids 1–99, lo que existe en el mundo) e `ITEMS` (ids desde 100, lo que NO es un bloque: manzana, palo, herramientas). Para un objeto nuevo: entrada en `ITEMS` + nombre en `ID` (`config.js`) + sprite en `itemSprites` (`textures.js`) + receta en `objetos.js` si se fabrica. Se dibujan con `makeItemGeometry`/`itemMaterial` (`effects.js`), nunca con `makeBlockGeometry`. **Usá `ID.MESA`, `ID.PALO`… en vez de números sueltos.** Un id de objeto nunca debe terminar en `chunks`. Detalle en [docs/03-arquitectura.md](docs/03-arquitectura.md#objetos-planos-y-la-mano-effectsjs).
