@@ -10,6 +10,7 @@ const path = require('path');
 const exe = process.env.MINICRAFT_EXE || path.join(__dirname, '..', 'dist', 'win-unpacked', 'MiniCraft.exe');   // MINICRAFT_EXE: probar un .exe ya instalado
 const PUERTO = 9333;
 const datos = fs.mkdtempSync(path.join(os.tmpdir(), 'minicraft-empaquetado-'));
+fs.cpSync(path.join(__dirname, '..', 'mods-ejemplo', 'rubi'), path.join(datos, 'mods', 'rubi'), { recursive: true });   // un mod instalado: tiene que cargarse desde afuera del .asar
 const pausa = ms => new Promise(r => setTimeout(r, ms));
 const errores = [];
 let proceso;
@@ -64,6 +65,9 @@ async function main() {
 
   const tieneAgua = await evaluar(`typeof mc.pasoAgua === 'function' && typeof mc.spawnMob === 'function' && !!mc.ITEMS[116]`);
   if (!tieneAgua) return fallar('faltan partes del juego (agua, mobs u objetos)');
+  const mods = await evaluar('mc.mods.cargados().cargados.map(m => m.id).join()');
+  if (mods !== 'rubi') return fallar('el mod de ejemplo no se cargo en el juego empaquetado (cargados: "' + mods + '"; fallidos: ' + await evaluar('JSON.stringify(mc.mods.cargados().fallidos)') + ')');
+  console.log('✔ el mod de ejemplo (rubi) se carga desde la carpeta de mods');
   const guardo = await evaluar('mc.guardarAhora()');
   if (!guardo) return fallar('no se pudo guardar la partida');
   const archivo = path.join(datos, 'mundos', 'empaquetado', 'mundo.json.gz');

@@ -10,6 +10,8 @@ import { renderer, scene, camera, handScene, handCamera, canvas, sun, applyRende
 import { chunks, chunkKey, savedChunks, generateChunk, heightAt, biomeAt, BIOMA_NOMBRE, cabanaEn, esCueva, getBlock, setBlock, updateChunks } from './world.js';
 import { tickAgua, pasoAgua } from './agua.js';
 import { colisiona, moverEje } from './fisica.js';
+import { emit, hayOyentes } from './eventos.js';
+import { estadoMods, modsCargados } from './mods.js';
 import { mobs, TIPOS, spawnMob, actualizarMobs, apuntarMob, golpear, quitar as quitarMob } from './mobs.js';
 import { skyMesh, updateSky, daylight, setTime, skipTime, clockString } from './sky.js';
 import { crackMesh, setCrackStage, hand, startSwing, spawnBreakParticles, updateParticles, updateHand } from './effects.js';
@@ -225,6 +227,7 @@ function updateMining(dt) {
   if (mining.p >= 1) {
     spawnBreakParticles(mining.x, mining.y, mining.z, b);
     setBlock(mining.x, mining.y, mining.z, 0);
+    emit('bloque-roto', { x: mining.x, y: mining.y, z: mining.z, id: b });
     if (puedeRecoger(mano, bloque)) dropForBlock(b, mining.x, mining.y, mining.z);   // suelta el objeto (la piedra sin pico no suelta nada)
     gastarHerramienta();                                    // la herramienta pierde un uso (y se rompe al agotarse)
     gastar(0.005);                                          // romper cansa un poquito
@@ -251,6 +254,7 @@ function placeBlock() {
   const p = player.pos;       // no poner un bloque dentro del jugador
   if (p.x + W > px && p.x - W < px + 1 && p.y + PH > py && p.y < py + 1 && p.z + W > pz && p.z - W < pz + 1) return;
   setBlock(px, py, pz, id);
+  emit('bloque-puesto', { x: px, y: py, z: pz, id });
   consumeHeld();                                            // gasta 1 del inventario (no en creativo)
   startSwing();
 }
@@ -267,7 +271,8 @@ function frame(now) {
   renderer.info.reset();
   updateChunks(player.pos.x, player.pos.z, 4, 3, 5);
   actualizarMobs(locked ? dt : 0);                          // los mobs caminan, aparecen y atacan (en pausa no)
-  tickAgua(locked ? dt : 0);                                // el agua fluye (en pausa no)
+  tickAgua(locked ? dt : 0);
+  if (hayOyentes('cuadro') && locked) emit('cuadro', { dt });                                // el agua fluye (en pausa no)
 
   if (locked && !player.muerto && chunks.has(chunkKey(Math.floor(player.pos.x / CS), Math.floor(player.pos.z / CS)))) {
     const steps = Math.ceil(dt / (1 / 90));
@@ -381,13 +386,14 @@ setTimeout(async () => {
   }
   player.fallMax = player.lastY = player.pos.y;
   iniciarGuardado();
+  emit('inicio', {});
   document.getElementById('status').textContent = '';
   document.getElementById('playBtn').style.display = 'block';
   requestAnimationFrame(frame);
 }, 30);
 
 // Util para experimentar desde la consola (F12)
-window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, guardarAhora: guardarPartida, mundoId, getBlock, setBlock, generateChunk, heightAt, biomeAt, BIOMA_NOMBRE, cabanaEn, esCueva, pasoAgua, mobs, TIPOS, spawnMob, golpearMob: golpear, quitarMob, apuntarMob, scene, camera, setTime,
+window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, guardarAhora: guardarPartida, mundoId, getBlock, setBlock, generateChunk, heightAt, biomeAt, BIOMA_NOMBRE, cabanaEn, esCueva, pasoAgua, mods: { estado: estadoMods, cargados: modsCargados }, mobs, TIPOS, spawnMob, golpearMob: golpear, quitarMob, apuntarMob, scene, camera, setTime,
               renderer, spawnBreakParticles, hand, mining, startSwing, selectSlot, sun, mouse,
               applyQuality, applyRenderScale, inventory, invAdd, openInventory, closeInventory, setThirdPerson, drops, spawnDrop, setCreative,
               craft, resultadoCraft, ID, ITEMS, itemSprites, buscarReceta, maxPila,

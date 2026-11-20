@@ -1,9 +1,15 @@
 // ============================================================
 // preload.js - Puente entre el juego (pagina) y el proceso principal de Electron.
-// Expone solo window.guardado con cinco funciones (listar, cargar, guardar, borrar, alCerrar);
-// la pagina no recibe acceso a Node ni a archivos. Los mundos se identifican por un id (ver guardado-main.js).
+// Expone solo window.guardado (listar, cargar, guardar, borrar, alCerrar) y window.mods (listar, abrirCarpeta);
+// la pagina no recibe acceso a Node ni a archivos. Los mundos se identifican por un id (ver guardado-main.js)
+// y los mods llegan ya validados por mods-main.js.
 // ============================================================
 const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('mods', {
+  listar: () => ipcRenderer.invoke('mods:listar'),
+  abrirCarpeta: () => ipcRenderer.invoke('mods:abrir-carpeta'),
+});
 
 contextBridge.exposeInMainWorld('guardado', {
   listar: () => ipcRenderer.invoke('mundo:listar'),

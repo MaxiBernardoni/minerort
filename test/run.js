@@ -15,6 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { registrar, escribir, listar } = require('../guardado-main.js');
+const { registrarMods } = require('../mods-main.js');
 
 const LIMITE_MS = 5 * 60 * 1000;     // si las pruebas se cuelgan, se corta y falla
 const base = fs.mkdtempSync(path.join(os.tmpdir(), 'minicraft-test-'));
@@ -22,6 +23,7 @@ const leer = nombre => fs.readFileSync(path.join(__dirname, nombre), 'utf8');
 const pausa = ms => new Promise(r => setTimeout(r, ms));
 
 registrar(ipcMain, () => base, () => {});      // mismo codigo de guardado que main.js, sin ruido en la consola
+registrarMods(ipcMain, () => base);            // y de mods (la carpeta de mods de las pruebas es base/mods)
 
 app.whenReady().then(async () => {
   let codigo = 1;
@@ -37,7 +39,7 @@ app.whenReady().then(async () => {
     });
     const erroresConsola = [];
     win.webContents.on('console-message', (e, nivel, mensaje, linea, fuente) => {
-      if (nivel >= 3) erroresConsola.push(`${mensaje} (${path.basename(fuente || '?')}:${linea})`);   // 3 = error (los avisos de seguridad son nivel 2)
+      if (nivel >= 3 && !/^\[mods?[ \]]/.test(mensaje)) erroresConsola.push(`${mensaje} (${path.basename(fuente || '?')}:${linea})`);   // 3 = error (los avisos de seguridad son nivel 2)
     });
     win.webContents.on('render-process-gone', (e, d) => { console.log('✘ El renderer se cayo:', d.reason); app.exit(1); });
 
@@ -130,6 +132,45 @@ app.whenReady().then(async () => {
         detalle: '',
       });
       } catch (e) { resultados.push({ nombre: 'menu: migrar la partida de la version anterior', ok: false, detalle: e.message }); }
+
+      // 6. Mods (Fase 6). Se arman en la carpeta de mods de las pruebas (base/mods): el mod de ejemplo, tres que no se pueden
+      //    cargar (uno tira un error, otro es de otra version de la API y una carpeta sin manifiesto), y despues el ejemplo se
+      //    borra y vuelve, junto con otro mod que se carga ANTES (para ver que los ids del mundo no se corren).
+      try {
+        const dirMods = path.join(base, 'mods'), MODS = '?mundo=mods&nombre=Mods&semilla=1337', MODS_YA = '?mundo=mods&nombre=Mods';
+        const escribirMod = (carpeta, manifiesto, codigo) => {
+          const d = path.join(dirMods, carpeta); fs.mkdirSync(d, { recursive: true });
+          if (manifiesto) fs.writeFileSync(path.join(d, 'mod.json'), JSON.stringify(manifiesto));
+          if (codigo) fs.writeFileSync(path.join(d, 'mod.js'), codigo);
+        };
+        fs.cpSync(path.join(__dirname, '..', 'mods-ejemplo', 'rubi'), path.join(dirMods, 'rubi'), { recursive: true });
+        escribirMod('roto', { id: 'roto', nombre: 'Roto', version: '1', apiVersion: 1 }, "export default function () { throw new Error('a proposito'); }");
+        escribirMod('mala-api', { id: 'mala-api', nombre: 'Otra API', version: '1', apiVersion: 99 }, 'export default function () {}');
+        escribirMod('sin-manifiesto', null, null);
+        escribirMod('escapa', { id: 'escapa', nombre: 'Escapa', version: '1', apiVersion: 1, main: '../roto/mod.js' }, null);         // "main" fuera de su carpeta
+        escribirMod('zzz-dup', { id: 'zzz-dup', nombre: 'Duplicado', version: '1', apiVersion: 1 },          // registra dos veces lo mismo (se carga despues de 'rubi')
+          "export default function (api) { const s = { filas: ['o'], paleta: { o: '#000000' } }; api.objeto('x', { sprite: s }); api.objeto('x', { sprite: s }); }");
+        await abrirJuego(MODS);
+        resultados.push(...await ejecutar('pruebas-mods.js', 'cargado'));
+        fs.rmSync(path.join(dirMods, 'rubi'), { recursive: true });            // el mod desaparece
+        await abrirJuego(MODS_YA);
+        resultados.push(...await ejecutar('pruebas-mods.js', 'faltante'));
+        fs.cpSync(path.join(__dirname, '..', 'mods-ejemplo', 'rubi'), path.join(dirMods, 'rubi'), { recursive: true });   // vuelve
+        escribirMod('aaa', { id: 'aaa', nombre: 'Primero', version: '1', apiVersion: 1 },
+          `export default function (api) {        // se carga antes que 'rubi'. Cuenta los eventos que recibe (window.__aaa) y tiene un oyente roto a proposito
+            api.bloque('cosa', { nombre: 'Cosa', textura: [60, 90, 200] });
+            const n = window.__aaa = { inicio: 0, cuadro: 0, puesto: 0, muerto: 0, malos: 0, ultimo: null };
+            api.on('inicio', () => n.inicio++);
+            api.on('cuadro', () => n.cuadro++);
+            api.on('bloque-puesto', e => { n.puesto++; n.ultimo = e; });
+            api.on('mob-muerto', e => { n.muerto++; n.ultimo = e; });
+            api.on('cuadro', () => { n.malos++; throw new Error('oyente roto'); });
+          }`);
+        await abrirJuego(MODS_YA);
+        resultados.push(...await ejecutar('pruebas-mods.js', 'vuelto'));
+        await abrirMenu();
+        resultados.push(...await ejecutar('pruebas-mods.js', 'menu'));
+      } catch (e) { resultados.push({ nombre: 'mods: cargar, perder y recuperar un mod', ok: false, detalle: e.message }); }
     }
 
     resultados.push({

@@ -66,6 +66,9 @@
   #menu button { padding: 6px 14px; font-size: 14px; color: #fff; cursor: pointer; border: 2px solid #fff; }
   #menu .jugarBtn, #crearBtn { background: #4a9a3a; }
   #menu .borrarBtn { background: #6b2a2a; border-color: #c98a8a; }
+  #menuMods { width: min(560px, 92vw); margin-top: 18px; font-size: 13px; opacity: .85; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #menuMods span { flex: 1 1 200px; }
+  #menuMods .error { color: #ffb0b0; }
   #menuNuevo { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: min(560px, 92vw); }
   #menuNuevo input { padding: 6px 8px; font-size: 14px; flex: 1 1 160px; min-width: 0; }
 </style>
@@ -90,6 +93,7 @@
     <input id="nuevaSemilla" placeholder="Semilla (opcional)" maxlength="20">
     <button id="crearBtn">Crear mundo</button>
   </div>
+  <div id="menuMods"><span id="menuModsTexto"></span><button id="modsBtn" style="display:none">Abrir carpeta de mods</button></div>
 </div>
 <div id="overlay">
   <h1>MiniCraft</h1>

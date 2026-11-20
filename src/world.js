@@ -95,6 +95,14 @@ function cabanaEn(gx, gz) {
 }
 
 // ---------- 2. Generacion de chunks ----------
+// Los mods se enganchan aca (registrarGancho): cada funcion recibe un contexto al terminar de generarse un chunk (ver mods.js)
+const ganchos = [];
+function registrarGancho(funcion) { ganchos.push(funcion); }
+function crearAzar(semilla) {                          // generador de numeros 0..1 que siempre da la misma serie para la misma semilla
+  let r = semilla >>> 0;
+  return () => ((r = (Math.imul(r, 1664525) + 1013904223) >>> 0) / 4294967296);
+}
+
 const chunks = new Map();
 const chunkKey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 // Chunks modificados que se descargaron: se guardan aca para no perder lo construido al alejarse.
@@ -216,6 +224,21 @@ function generateChunk(cx, cz) {
       set(cab.x + 1, cab.y + 1, cab.z + 1, ID.MESA, true);
     }
   }
+  if (ganchos.length) {                                // mods: pueden agregar minerales, estructuras, etc. (deterministico: mismo chunk, mismo resultado)
+    const ctx = {
+      cx, cz, CS, H, semilla: seed, hash2, data, heightAt, biomeAt,
+      azar: sal => crearAzar(hash2(cx, cz, seed + 9000 + (sal | 0) * 131) * 4294967296),
+      // pone un bloque en coordenadas LOCALES del chunk (0..15); `solo` = lo unico que reemplaza (por defecto piedra; null = todo)
+      colocar(lx, y, lz, id, solo = 3) {
+        if (lx < 0 || lx >= CS || lz < 0 || lz >= CS || y < 1 || y >= H) return false;
+        const i = y * 256 + lz * 16 + lx;
+        if (solo !== null && data[i] !== solo) return false;
+        data[i] = id; if (y > ch.maxY) ch.maxY = y;
+        return true;
+      },
+    };
+    for (const g of ganchos) g(ctx);
+  }
   return ch;
 }
 
@@ -321,7 +344,11 @@ const PW = CS + 2, PL = PW * PW;
 const pad = new Uint8Array(PL * (H + 2));
 const OPAQUE = new Uint8Array(256);                    // 1 = tapa las caras vecinas
 const IS_WATER = new Uint8Array(256);                  // 1 = agua (fuente o fluyendo)
-for (const k of Object.keys(BLOCKS)) { const b = +k; IS_WATER[b] = isWater(b) ? 1 : 0; OPAQUE[b] = (b === LEAVES || IS_WATER[b]) ? 0 : 1; }   // todos los bloques tapan, menos hojas y agua
+// todos los bloques tapan, menos hojas y agua. Se vuelve a llamar cuando un mod suma bloques (mods.js).
+function actualizarTablas() {
+  for (const k of Object.keys(BLOCKS)) { const b = +k; IS_WATER[b] = isWater(b) ? 1 : 0; OPAQUE[b] = (b === LEAVES || IS_WATER[b]) ? 0 : 1; }
+}
+actualizarTablas();
 // Luz del cielo: bajo el techo (el bloque opaco mas alto de la columna) oscurece CONFIG.luzPorBloque por bloque, hasta CONFIG.luzMinima. Es lo que hace oscuras las cuevas.
 const LUZ = new Float32Array(80);
 for (let d = 0; d < 80; d++) LUZ[d] = d < 1 ? 1 : Math.max(CONFIG.luzMinima, 1 - CONFIG.luzPorBloque * d);
@@ -546,5 +573,5 @@ function updateChunks(px, pz, genBudget, meshBudget, msBudget = 4) {
 // Fuerza a recalcular los radios de carga (lo usa quality.js al cambiar la distancia de vision)
 function resetLoadRadius() { genOffsets = null; }
 
-export { chunks, chunkKey, savedChunks, generateChunk, heightAt, biomeAt, BIOMA, BIOMA_NOMBRE, esCueva, cabanaEn, getBlock, setBlock, rehacerMallas, activeWater, waterKey, chunkLoaded,
+export { actualizarTablas, registrarGancho, chunks, chunkKey, savedChunks, generateChunk, heightAt, biomeAt, BIOMA, BIOMA_NOMBRE, esCueva, cabanaEn, getBlock, setBlock, rehacerMallas, activeWater, waterKey, chunkLoaded,
          updateChunks, resetLoadRadius, FACES, QUV, waterMaterial, windUniform };

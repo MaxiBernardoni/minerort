@@ -12,11 +12,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { registrar } = require('../guardado-main.js');
+const { registrarMods } = require('../mods-main.js');
 
 const raiz = path.join(__dirname, '..');
 const salida = path.join(raiz, 'capturas');
 const base = fs.mkdtempSync(path.join(os.tmpdir(), 'minicraft-captura-'));
 registrar(ipcMain, () => base, () => {});
+registrarMods(ipcMain, () => base);
 fs.mkdirSync(salida, { recursive: true });
 
 const MANO = { x: 640, y: 300, width: 640, height: 420 };           // abajo a la derecha, donde esta el brazo

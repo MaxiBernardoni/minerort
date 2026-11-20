@@ -19,6 +19,7 @@ import { chunks, savedChunks, chunkKey } from './world.js';
 import { dayT, setTime } from './sky.js';
 import { inventory, creative, selected, setCreative, selectSlot, toast } from './inventory.js';
 import { player } from './player.js';
+import { cargarMods, estadoMods } from './mods.js';
 
 const VERSION = 1;               // debe coincidir con VERSION de guardado-main.js
 const CADA_MS = 30000;           // autoguardado
@@ -38,6 +39,7 @@ async function guardarPartida() {
     hora: dayT,
     creativo: creative,
     seleccionado: selected,
+    mods: estadoMods(),                                           // la tabla de ids de los bloques y objetos de mods de este mundo (ver mods.js)
     itemsV: 2,                                                    // 2 = la manzana es el id 100 (antes era el 11, hoy la mesa de crafteo)
     inventario: inventory.map(s => s && { id: s.id, count: s.count, dano: s.dano }),   // dano = usos gastados de una herramienta
     vida: player.vida, hambre: player.hambre, saturacion: player.saturacion,
@@ -56,7 +58,9 @@ async function cargarPartida() {
     try { e = await window.guardado.cargar(mundoId); }
     catch (err) { console.error('[guardado] no se pudo cargar:', err); }
   }
-  if (!e || e.version !== VERSION) {
+  const hayEstado = !!e && e.version === VERSION;
+  await cargarMods(hayEstado ? e.mods && e.mods.tabla : null);     // los mods se registran ANTES de leer chunks e inventario (que pueden tener sus ids)
+  if (!hayEstado) {
     // Mundo nuevo: la semilla viene de la direccion (el menu la elige al crearlo)
     const s = parametros.get('semilla');
     if (s !== null && Number.isFinite(+s)) CONFIG.seed = +s | 0;

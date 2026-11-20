@@ -1,6 +1,6 @@
 # 03 · Arquitectura
 
-> Última revisión: 2026-11-20 · Corresponde al código después de completar la Fase 4 (mobs y combate; antes, la Fase 3: cuevas, minerales, biomas, agua que fluye y cabañas). Hay cambios sin commitear desde `76eb7fd` (la Fase 2).
+> Última revisión: 2026-11-20 · Corresponde al código después de los mods (Fase 6, primera mitad); antes, las Fases 3 a 5. Hay cambios sin commitear desde `76eb7fd` (la Fase 2).
 > Este documento está pensado para dárselo a una IA al empezar una sesión. Los nombres de archivos y funciones salen del código real.
 
 ## Vista general
@@ -41,7 +41,9 @@ game.js ─▶ todos los de abajo
 agua.js ─▶ world, config
 mobs.js ─▶ fisica, salud, inventory, effects, sky, world, scene, player, textures, config
 fisica.js ─▶ world, config
-guardado.js ─▶ inventory, sky, world, player, config
+guardado.js ─▶ mods, inventory, sky, world, player, config
+mods.js ─▶ mobs, inventory, eventos, world, objetos, textures, config
+eventos.js ─▶ (nada)
 salud.js ─▶ inventory, player, config
 menu.js ─▶ (nada: solo usa window.guardado y el HTML)
 inventory.js ─▶ objetos, player, effects, sky, world, scene, textures, config
@@ -62,6 +64,8 @@ config.js ─▶ (nada)
 | `config.js` | `CONFIG`, `QUALITY`, `ID`, `BLOCKS`, `ITEMS`, `itemInfo`, `CS`, `H`, `WATER`, `LEAVES`, `ITEM_IDS`, `isSolidB`, `isOpaque`, `isWater`, `nivelAgua`, `alturaAgua` | — |
 | `agua.js` | `tickAgua`, `pasoAgua` | `world`, `config` |
 | `fisica.js` | `colisiona`, `moverEje` | `world`, `config` |
+| `eventos.js` | `EVENTOS`, `on`, `emit`, `hayOyentes` | — |
+| `mods.js` | `API_VERSION`, `cargarMods`, `estadoMods`, `modsCargados` | `mobs`, `inventory`, `eventos`, `world`, `objetos`, `textures`, `config` |
 | `mobs.js` | `mobs`, `TIPOS`, `spawnMob`, `actualizarMobs`, `apuntarMob`, `golpear`, `quitar` | `fisica`, `salud`, `inventory`, `effects`, `sky`, `world`, `scene`, `player`, `textures`, `config` |
 | `objetos.js` | `maxPila`, `RECETAS`, `buscarReceta`, `velocidadDeMinado`, `puedeRecoger`, `esHerramienta`, `MAX_PILA` | `config` |
 | `textures.js` | `atlasTexture`, `waterTexture`, `crackTextures`, `itemSprites`, `tileUV`, `tileAvg`, `makeBlockIcon`, `hash2`, `tn`, `smooth`, `lerp` | `config` |
@@ -91,6 +95,10 @@ config.js ─▶ (nada)
 | `src/salud.js` | 161 | Vida, hambre, daño por caída, muerte y reaparición, y la barra de corazones y muslos. |
 | `src/menu.js` | 82 | Menú principal: lista, crea y borra mundos. |
 | `src/agua.js` | 72 | El agua que fluye: cada celda activa mira a sus vecinos y toma su nivel (ver "Agua que fluye"). |
+| `mods-main.js` | 63 | Lado Electron de los mods: lista las carpetas de `<datos>\mods`, valida el manifiesto (id, `apiVersion`, `main` adentro de la carpeta) y entrega a la página direcciones `file://` ya validadas (`mods:listar`, `mods:abrir-carpeta`). Lo usan `main.js` y `test/run.js`. |
+| `src/mods.js` | 199 | Importa cada mod, le da la `api` (bloque, objeto, receta, mob, alGenerarChunk, on…), asigna los ids por nombre y guarda esa tabla en el mundo, y deja marcadores "desconocido" para los mods que faltan. |
+| `src/eventos.js` | 36 | Los avisos del juego a los mods (inicio, cuadro, bloque-roto, bloque-puesto, mob-muerto). |
+| `mods-ejemplo/rubi/` | — | Un mod completo de ejemplo (mineral, gema, pico, receta, generación, mob y evento). Lo usan las pruebas. No lo carga el juego solo: se copia a la carpeta de mods. |
 | `src/fisica.js` | 38 | El choque de una caja contra los bloques (`colisiona`, `moverEje`). Lo usan el jugador y los mobs. |
 | `src/mobs.js` | 292 | Cerdo, vaca y zombi: modelos (cajas con color por vértice, unidas), IA, aparición cerca del jugador, y el combate (rayo contra las cajas, daño, empujón, botín). |
 | `src/world.js` | 550 | Biomas, cuevas, minerales, cabañas, árboles, chunks, acceso a bloques, generación de mallas (con la luz del cielo) y carga/descarga. |
@@ -336,6 +344,7 @@ El README original dice que la estructura está "pensada para pedirle cambios ar
 | Cómo se ve una textura | `textures.js` |
 | Un mob nuevo, su IA, su botín o cuántos aparecen | `mobs.js` (`TIPOS`, `actualizarMob`, `intentarAparecer`) y `config.js` (`maxMobs`) |
 | Cómo chocan los cuerpos con los bloques (jugador y mobs) | `fisica.js` |
+| La API de mods, qué pueden hacer los mods, la carpeta de mods | `mods.js` (API y carga), `mods-main.js` (carpeta y manifiesto), `eventos.js`, y documentarlo en `docs/07-mods.md` |
 | Pegarle a un mob, el arma y el daño | `game.js` (`atacarMob`), `mobs.js` (`golpear`) y `config.js` (`danio` en `ITEMS`) |
 | Cómo es el terreno, árboles, biomas, cuevas, minerales, cabañas | `world.js` (`heightAt`, `biomeAt`, `esCueva`, `cabanaEn`, `generateChunk`) |
 | Qué tan oscuras son las cuevas | `config.js` (`luzMinima`, `luzPorBloque`) y `world.js` (`fillPad`, `LUZ`) |
@@ -352,9 +361,22 @@ El README original dice que la estructura está "pensada para pedirle cambios ar
 | Qué se guarda en la partida | `guardado.js` (estado) y `guardado-main.js` (archivo) |
 | Lo que la página puede pedirle a Electron | `preload.js` (y el handler en `guardado-main.js`/`main.js`) |
 
+## Mods (`mods.js`, `mods-main.js`, `eventos.js`)
+
+Guía para quien ESCRIBE un mod: [07-mods.md](07-mods.md). Esto es cómo está hecho:
+
+- **Del disco a la página:** `mods-main.js` (proceso principal) lee `<datos>\mods\*\mod.json`, lo valida y devuelve `{ carpeta, id, manifest, url }` (o `error`) por IPC (`window.mods.listar()`, ver `preload.js`). **La página no elige rutas**: recibe una dirección `file://` que ya quedó adentro de la carpeta del mod. `src/mods.js` hace `import(url)` y llama a la función por defecto con la `api`. Un `import` de `file://` desde la página del juego anda tanto en desarrollo como empaquetado (la página también es `file://`).
+- **Cuándo:** `cargarPartida` (en `guardado.js`) llama a `cargarMods(tablaGuardada)` **justo después de leer el archivo del mundo y antes de aplicar chunks, inventario o generar nada**: lo que el mundo guardó puede tener ids de mods. En un mundo nuevo, la tabla es `null`. El menú no carga mods (solo los lista).
+- **Ids estables:** `asignar(tipo, clave)` busca la clave (`"rubi:mineral"`) en la tabla del mundo; si no está, toma el primer id libre (bloques 30–99, objetos 200–999). La tabla va en `estado.mods.tabla` (opcional en el archivo: no sube `VERSION`). Si el id guardado ya lo usa otra cosa, ese mod falla con un mensaje.
+- **Marcadores:** al terminar de cargar, todo id de la tabla que ningún mod registró recibe un bloque u objeto "desconocido" (tile 63 del atlas, o un sprite con un signo de pregunta), con `desconocido: true`. Así `BLOCKS[id]` nunca es `undefined` para un id que está en un chunk (el mallado se caería).
+- **Qué cambió en el motor para que los mods entren:** el atlas tiene 64 tiles (0–19 del juego, 20–62 para `tileNuevo`, 63 desconocido); `world.js` tiene `actualizarTablas()` (rehace `OPAQUE` e `IS_WATER` con los bloques nuevos) y `registrarGancho` (funciones que reciben un `ctx` al terminar de generar un chunk); `inventory.js` exporta `agregarAlCatalogo`; `mobs.js` tiene `registrarTipo` y un modelo genérico (`cuadrupedo`/`humanoide` pintado con dos colores), y elige qué mob aparece entre **todos** los de `TIPOS`; `game.js` y `mobs.js` avisan los eventos.
+- **Errores:** cada mod se carga dentro de un `try`; un oyente de evento, o un gancho de generación, que falla 5 veces deja de llamarse (`eventos.js`, `alGenerarChunk`). Los mensajes empiezan con `[mod id]` o `[mods]`; `test/run.js` no los cuenta como "errores en la consola" (los mods rotos de las pruebas los escriben a propósito).
+- **Para sumar algo a la API:** una función en `crearApi` (`mods.js`) y, si el motor no alcanza, el gancho que falte; documentarla en `07-mods.md`; una prueba en `test/pruebas-mods.js` y, si es algo que ve el mod de ejemplo, ahí. **Si cambia algo que ya existe, subir `API_VERSION` en `mods.js` Y en `mods-main.js`** (los dos tienen que coincidir).
+
 ## Empaquetado (instalador)
 
 - **Qué entra al paquete** lo decide `build.files` en `package.json`: los archivos de arriba más `src/**/*` y `node_modules/three/build/three.module.js`. electron-builder agrega solo las dependencias de producción completas (three entero, con ejemplos y fuentes, son 400 archivos más y unos 4 MB); por eso hay patrones `!node_modules/three/...` que dejan solo lo que carga el import map de `index.html`.
+- **`mods-main.js` está en `build.files`** (los mods no andan en el juego instalado si falta). Los mods **no** van en el paquete: viven en la carpeta de datos del usuario.
 - **Si agregás un archivo en la raíz** (por ejemplo otro `.js` del proceso principal), **hay que sumarlo a `build.files`**: los archivos de `src/` entran solos, los de la raíz no. Si falta algo, el juego instalado falla y `npm start` no: por eso existe `npm run probar-empaquetado`.
 - **Si cambiás la versión de three**, cambiá también el nombre del archivo en `build.files` y en el import map.
 - **Rutas:** el código no usa rutas relativas al proyecto salvo `__dirname` en `main.js` (dentro del paquete es `app.asar`, y funciona igual) y los datos van a `app.getPath('userData')`. `productName` ("MiniCraft") hace que la carpeta de datos se llame `MiniCraft`; Windows no distingue mayúsculas, así que es la misma `minicraft` de siempre.

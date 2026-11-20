@@ -197,7 +197,7 @@ for (let k = 0; k < 9; k++) { const el = makeSlotEl('islot'); attachSlot(el, CEL
 attachSlot(resultEl, RESULTADO);
 
 const catalogSlots = [];            // { el, id }
-ITEM_IDS.forEach(id => {
+function agregarAlCatalogo(id) {    // tambien lo usan los mods (mods.js) para sumar lo suyo
   const el = makeSlotEl('islot');
   renderSlot(el, { id, count: 1 });
   el.lastChild.textContent = '';
@@ -211,7 +211,8 @@ ITEM_IDS.forEach(id => {
   el.addEventListener('mouseleave', () => { tipEl.style.display = 'none'; });
   catalogGrid.appendChild(el);
   catalogSlots.push({ el, id });
-});
+}
+ITEM_IDS.forEach(agregarAlCatalogo);
 
 let pestanaActual = 'todo';
 const sinAcentos = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");   // "Adoquín" se encuentra buscando "adoquin"
@@ -497,4 +498,4 @@ refreshInventoryUI();
 
 const resultadoCraft = () => resultado;           // lo que se fabricaria ahora con la grilla (para las pruebas)
 
-export { inventory, craft, resultadoCraft, invAdd, heldId, consumeHeld, gastarHerramienta, selected, creative, selectSlot, invOpen, openInventory, closeInventory, hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop };
+export { inventory, craft, resultadoCraft, invAdd, heldId, consumeHeld, gastarHerramienta, selected, creative, selectSlot, invOpen, openInventory, closeInventory, hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop, agregarAlCatalogo, filtrarCatalogo };

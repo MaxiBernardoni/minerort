@@ -64,11 +64,31 @@ async function pintarLista() {
   el('nuevoNombre').placeholder = `Mundo ${mundos.length + 1}`;
 }
 
+// Una linea con los mods instalados (y los que tienen errores) y el boton para abrir la carpeta donde se ponen
+async function pintarMods() {
+  if (!window.mods) return;
+  const texto = el('menuModsTexto');
+  try {
+    const lista = await window.mods.listar();
+    const buenos = lista.filter(m => !m.error), malos = lista.filter(m => m.error);
+    texto.textContent = buenos.length ? 'Mods: ' + buenos.map(m => `${m.manifest.nombre} ${m.manifest.version}`).join(', ') : 'Sin mods instalados.';
+    if (malos.length) {
+      const e = document.createElement('div');
+      e.className = 'error';
+      e.textContent = malos.map(m => `${m.carpeta}: ${m.error}`).join(' · ');                    // textContent: lo escribe el autor del mod
+      texto.appendChild(e);
+    }
+  } catch (err) { texto.textContent = ''; }
+  el('modsBtn').style.display = '';
+  el('modsBtn').addEventListener('click', () => window.mods.abrirCarpeta());
+}
+
 export async function mostrarMenu() {
   window.guardado.alCerrar(async () => {});                          // en el menu no hay nada que guardar: confirma enseguida para que cerrar no espere
   el('overlay').style.display = 'none';
   el('menu').style.display = 'flex';
   await pintarLista();
+  pintarMods();
 
   const crear = () => {
     const nombre = el('nuevoNombre').value.trim() || el('nuevoNombre').placeholder;

@@ -95,14 +95,16 @@ Preparar el terreno para que el resto no se rompa. No agrega nada visible.
 
 > **Decisiones que tomó la IA** (fáciles de cambiar): instalador por usuario (sin pedir administrador) con elección de carpeta, acceso en Inicio y escritorio; solo Windows de 64 bits; **sin firma de código** (cuesta dinero: Windows va a avisar); sin actualización automática; versión 0.1.0; icono propio dibujado por código. **Se sumó electron-builder a `devDependencies`** (el CLAUDE.md pide preguntar por dependencias nuevas, pero el roadmap ya lo nombraba y Max pidió el instalador).
 
-### Fase 6 · Multijugador y mods
+### Fase 6 · Multijugador y mods (mods ✅, multijugador pendiente)
 
-Las dos más grandes; quedan al final porque exigen que lo demás sea estable.
+Las dos más grandes; quedan al final porque exigen que lo demás sea estable. **Max eligió empezar por los mods** (2026-11-20, con un mod instalado a mano y confiando en él; y aprobó sumar la dependencia `ws` para el multijugador, que todavía no se hizo).
 
 | Función | Depende de | Qué toca / notas |
 |---|---|---|
 | **Multijugador** | Persistencia, módulos, Fase 0 | Hoy el estado vive en variables globales y todo corre en un cliente. Hay que separar "estado del mundo" de "dibujo". Recomendación abajo. |
-| **Mods** (hechos por otras personas) | Módulos ES, registro de bloques/ítems | `BLOCKS` ya está basado en datos, lo cual ayuda. Falta una API pública para registrar bloques, ítems y eventos, una carpeta `mods/`, un ejemplo y documentación para quien escriba un mod. Ver más abajo. |
+| ✅ **Mods** (hechos por otras personas) | Módulos ES, registro de bloques/ítems | **Hecho (2026-11-20):** una carpeta de mods (`%APPDATA%\minicraft\mods`), una API versión 1 (bloques, objetos, recetas, mobs, generación, eventos), ids guardados por mundo, mods rotos o ausentes que no rompen nada, un mod de ejemplo y una guía ([07-mods.md](07-mods.md)). Ver [Mods](02-estado-actual.md#mods). Faltan: probarlo con un mod de otra persona y todo lo de "Límites de la versión 1". |
+
+> **Decisiones que tomó la IA en los mods** (fáciles de cambiar): una carpeta por mod con `mod.json` y `mod.js`; **sin aislamiento** (Max eligió confiar en los mods); los ids por nombre guardados en el mundo (en vez de ids fijos que elige el autor, que chocarían); marcadores "desconocido" para los mods que faltan; el juego **no** se registra a sí mismo por la API (el roadmap sugería "que el juego coma su propia comida"; era un cambio grande que no hacía falta para que anduvieran los mods); y una API chica a propósito.
 
 #### Multijugador: recomendación
 
@@ -117,7 +119,10 @@ Por qué no un servidor dedicado: es más trabajo (alojamiento, costos, mantenim
 
 Esta es la fase más grande y no se puede hacer antes de resolver la persistencia y separar el estado del dibujo.
 
-#### Mods: qué implica que los hagan otras personas
+#### Mods: qué implica que los hagan otras personas (estado: hecha la primera versión)
+
+*Lo de abajo es lo que se pensó antes de hacerlo. Ya están hechos: la API versionada y documentada (`apiVersion`, [07-mods.md](07-mods.md)), el formato (carpeta con manifiesto y JavaScript), la confianza total (sin aislamiento), y la distribución a mano. Siguen abiertos: aislar los mods, un lugar donde compartirlos, y que el juego se registre por su propia API.*
+
 
 - **API estable y documentada:** una vez que otros escriban mods, cambiar la API los rompe. Conviene definirla con cuidado y versionarla.
 - **Seguridad:** un mod es código ajeno ejecutándose dentro del juego. En Electron eso puede tocar archivos de la PC si no se aísla. Hay que decidir el nivel de confianza (¿solo mods que el usuario instala a mano y confía?, ¿o aislados?).

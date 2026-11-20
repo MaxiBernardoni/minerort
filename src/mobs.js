@@ -18,6 +18,7 @@ import { danar } from './salud.js';
 import { spawnDrop, creative } from './inventory.js';
 import { pixelBox } from './effects.js';
 import { hash2 } from './textures.js';
+import { emit } from './eventos.js';
 
 // ---------- 1. Modelos ----------
 // Todos miran hacia -Z (como el jugador). Un modelo es { cuerpo: geometria unida, patas: [{x, y, z, geo}], brazos: [...] }.
@@ -82,6 +83,45 @@ function modeloZombi() {
     cuerpo,
     patas: [[-0.1125, 0.675, 0], [0.1125, 0.675, 0]].map(([x, y, z]) => ({ x, y, z, geo: pierna })),
     brazos: [[-0.3375, 1.31, 0], [0.3375, 1.31, 0]].map(([x, y, z]) => ({ x, y, z, geo: brazo })),
+  };
+}
+
+// Modelo para los mobs de los mods: la forma ('cuadrupedo' | 'humanoide') pintada con dos colores (el del cuerpo y otro para detalles)
+function modeloGenerico(d) {
+  const c1 = d.color, c2 = d.color2 || c1.map(v => v * 0.65), OJO = d.ojos || [0.08, 0.06, 0.06];
+  const oscurecer = (c, k) => c.map(v => v * k);
+  const tono = (c, x, y, z, s) => mezcla(c, oscurecer(c, 0.85), ruido(x, y, z, s) * 0.9);
+  if (d.forma === 'humanoide') {
+    const cuerpo = unir([
+      caja(0.45, 0.675, 0.225, 0, 1.0125, 0, (x, y, z) => tono(c2, x, y, z, 31)),
+      caja(0.45, 0.45, 0.45, 0, 1.575, 0, (x, y, z) => (z < -0.2 && Math.abs(Math.abs(x) - 0.1) < 0.05 && y > -0.02 && y < 0.07 ? OJO : tono(c1, x, y, z, 32))),
+    ]);
+    const pierna = caja(0.225, 0.675, 0.225, 0, -0.3375, 0, (x, y, z) => tono(c2, x, y, z, 33));
+    const brazo = caja(0.225, 0.675, 0.225, 0, -0.3375, 0, (x, y, z) => tono(y > 0.1 ? c2 : c1, x, y, z, 34));
+    return {
+      cuerpo,
+      patas: [[-0.1125, 0.675, 0], [0.1125, 0.675, 0]].map(([x, y, z]) => ({ x, y, z, geo: pierna })),
+      brazos: [[-0.3375, 1.31, 0], [0.3375, 1.31, 0]].map(([x, y, z]) => ({ x, y, z, geo: brazo })),
+    };
+  }
+  const e = d.escala || 1, alto = 0.3 * e;                                   // cuadrupedo
+  const cuerpo = unir([
+    caja(0.5 * e, 0.46 * e, 0.8 * e, 0, alto + 0.23 * e, 0.05 * e, (x, y, z) => tono(c1, x, y, z, 35)),
+    caja(0.4 * e, 0.38 * e, 0.36 * e, 0, alto + 0.32 * e, -0.5 * e, (x, y, z) => (z < -0.15 * e && Math.abs(Math.abs(x) - 0.1 * e) < 0.05 * e && y > 0 && y < 0.09 * e ? OJO : tono(c2, x, y, z, 36))),
+  ]);
+  const pata = caja(0.15 * e, alto, 0.15 * e, 0, -alto / 2, 0, (x, y, z) => tono(c2, x, y, z, 37));
+  return { cuerpo, patas: [[-0.14, -0.2], [0.14, -0.2], [-0.14, 0.28], [0.14, 0.28]].map(([x, z]) => ({ x: x * e, y: alto, z: z * e, geo: pata })), brazos: [] };
+}
+
+// Para mods (mods.js): suma un tipo de mob. def: { nombre, forma, color, color2, escala, vida, vel, pasivo | hostil, danio, botin: [[id, min, max, prob]] }
+function registrarTipo(clave, def) {
+  if (!['cuadrupedo', 'humanoide'].includes(def.forma)) throw new Error('forma desconocida: ' + def.forma + " (usa 'cuadrupedo' o 'humanoide')");
+  if (!Array.isArray(def.color) || def.color.length !== 3) throw new Error('el mob necesita un color: [r, g, b] con valores de 0 a 1');
+  if (!!def.pasivo === !!def.hostil) throw new Error("el mob tiene que ser o pasivo o hostil (poné pasivo: true o hostil: true)");
+  const e = def.escala || 1, humano = def.forma === 'humanoide';
+  TIPOS[clave] = {
+    nombre: def.nombre || clave, vida: def.vida || 10, w: humano ? 0.3 : 0.4 * e, h: humano ? 1.8 : 0.9 * e, vel: def.vel || 1.8,
+    pasivo: !!def.pasivo, hostil: !!def.hostil, danio: def.danio || 2, botin: def.botin || [], modelo: () => modeloGenerico(def), mod: true,
   };
 }
 
@@ -220,10 +260,12 @@ function intentarAparecer() {
   if (vivos.length >= CONFIG.maxMobs) return;
   const noche = daylight < 0.4;
   const zombis = vivos.filter(m => m.def.hostil).length, animales = vivos.length - zombis;
+  const elegir = lista => lista[Math.floor(Math.random() * lista.length)];       // tambien aparecen los mobs de los mods
   let tipo;
-  if (noche && zombis < 4) tipo = 'zombi';
-  else if (animales < 6) tipo = Math.random() < 0.5 ? 'cerdo' : 'vaca';
+  if (noche && zombis < 4) tipo = elegir(Object.keys(TIPOS).filter(k => TIPOS[k].hostil));
+  else if (animales < 6) tipo = elegir(Object.keys(TIPOS).filter(k => TIPOS[k].pasivo));
   else return;
+  if (!tipo) return;
   const ang = Math.random() * Math.PI * 2, r = tipo === 'zombi' ? 14 + Math.random() * 18 : 18 + Math.random() * 26;
   const x = Math.floor(player.pos.x + Math.cos(ang) * r), z = Math.floor(player.pos.z + Math.sin(ang) * r);
   if (!chunkLoaded(x, z)) return;
@@ -231,7 +273,7 @@ function intentarAparecer() {
     const b = getBlock(x, y, z);
     if (isWater(b)) return;
     if (isSolidB(b) && b !== LEAVES && getBlock(x, y + 1, z) === 0 && getBlock(x, y + 2, z) === 0) {
-      if (tipo !== 'zombi' && b !== 1) return;                               // los animales, solo sobre cesped
+      if (TIPOS[tipo].pasivo && b !== 1) return;                             // los animales, solo sobre cesped
       spawnMob(tipo, x + 0.5, y + 1.01, z + 0.5);
       return;
     }
@@ -281,6 +323,7 @@ function golpear(m, danio, ox, oz) {
 // Empieza a caerse de costado; si `botin`, suelta lo suyo (no en creativo)
 function matar(m, botin) {
   m.muriendo = 0.4; m.vida = 0;
+  emit('mob-muerto', { tipo: m.tipo, x: m.pos.x, y: m.pos.y, z: m.pos.z, botin });
   if (!botin || creative) return;
   for (const [id, min, max, prob] of m.def.botin) {
     if (Math.random() > prob) continue;
@@ -289,4 +332,4 @@ function matar(m, botin) {
   }
 }
 
-export { mobs, TIPOS, spawnMob, actualizarMobs, apuntarMob, golpear, quitar };
+export { registrarTipo, mobs, TIPOS, spawnMob, actualizarMobs, apuntarMob, golpear, quitar };

@@ -1,6 +1,6 @@
 # 02 · Estado actual
 
-> Última revisión: 2026-11-20 (después de completar la Fase 5 del roadmap). El código tiene cambios sin commitear desde el commit `76eb7fd` (la Fase 2).
+> Última revisión: 2026-11-20 (después de completar los mods, la mitad de la Fase 6 del roadmap). El código tiene cambios sin commitear desde el commit `76eb7fd` (la Fase 2).
 > La lista sale de leer el código y se comprobó con pruebas automáticas (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)). Falta lo que depende de un humano; ver "Pendientes de verificar" al final.
 
 ## Resumen
@@ -17,7 +17,7 @@ npm start
 npm run empaquetar   # arma el instalador de Windows en dist/ (ver "Instalador de Windows")
 ```
 
-`npm test` corre 80 pruebas automáticas en alrededor de un minuto (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)), y `npm run captura` saca capturas del juego para mirar cómo se ve. F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estado del juego (jugador, chunks, inventario, salud, configuración) para experimentar.
+`npm test` corre 92 pruebas automáticas en alrededor de un minuto y medio (ver [06-checklist-pruebas.md](06-checklist-pruebas.md)), y `npm run captura` saca capturas del juego para mirar cómo se ve. F12 abre la consola de desarrollo. Desde la consola, `window.mc` expone el estado del juego (jugador, chunks, inventario, salud, configuración) para experimentar.
 
 ## Qué funciona
 
@@ -138,6 +138,16 @@ Lista completa de teclas en el [README principal](../README.md#controles).
 - **La piedra, el adoquín y el ladrillo solo sueltan algo si los rompés con pico.** Sin pico se rompen pero no dan nada. Con el kit inicial (16 tablones y 8 adoquines) ya se puede fabricar todo lo necesario.
 - Una herramienta no se puede poner como bloque ni comer.
 
+### Mods
+
+- **Qué es:** una carpeta (`mod.json` + `mod.js`) que suma **bloques, objetos, recetas, mobs, minerales y reacciones a eventos** sin tocar el código del juego. La guía para quien escribe un mod, con la API completa, está en [07-mods.md](07-mods.md), y hay un mod de ejemplo (rubíes) en `mods-ejemplo/rubi/`.
+- **Dónde se instalan:** `%APPDATA%\minicraft\mods\` (en el menú principal, **Abrir carpeta de mods**). Se cargan al entrar a un mundo, por orden alfabético de id. **Con el juego instalado y con `npm start` es la misma carpeta.**
+- **El menú lista** los mods instalados (nombre y versión) y, en rojo, los que tienen errores de manifiesto (sin `mod.json`, de otra versión de la API, `main` afuera de su carpeta…).
+- **Si un mod falla** al cargar (o hay otro con el mismo id) se saltea y el resto sigue; el motivo sale en la consola (F12) y un cartel al entrar. Un oyente de eventos que falla 5 veces se deja de llamar.
+- **Los ids de un mod se guardan en el mundo** (tabla `"mod:nombre"` → id): instalar otro mod no corre los ids de los mundos viejos. **Si el mod falta**, sus bloques y objetos quedan como "desconocidos" (damero magenta o signo de pregunta) con el mismo id, y el mundo carga igual; si el mod vuelve, todo vuelve a ser lo que era.
+- **Qué usa el juego de la API:** el juego **no registra lo suyo por la misma API** (sigue con `BLOCKS` e `ITEMS` en `config.js`): los mods usan las mismas tablas y funciones por debajo, pero el camino de registro es aparte. Ver limitación 28.
+- **Seguridad:** un mod es código que se instala a mano y se **confía** en él: corre dentro de la página del juego (sin `require` ni acceso directo a archivos, pero con la red y el DOM). No hay aislamiento. Está explicado en [07-mods.md](07-mods.md).
+
 ### Instalador de Windows
 
 - **Cómo se arma:** `npm run empaquetar` (electron-builder, instalador NSIS) deja `dist\MiniCraft-Setup-0.1.0.exe` (unos 84 MB; instalado ocupa unos 270 MB, casi todo Electron/Chromium). `npm run empaquetar:carpeta` arma solo la carpeta `dist\win-unpacked` (sin instalador, más rápido). La primera vez descarga Electron y las herramientas de NSIS (internet).
@@ -188,7 +198,6 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 - Multijugador.
 - Sonido y música.
 - Menú de opciones (el menú principal solo maneja mundos).
-- Mods o extensiones.
 
 ## Limitaciones conocidas (leídas del código)
 
@@ -219,6 +228,10 @@ Estas ausencias son intencionales por ahora y están en el [roadmap](04-roadmap.
 25. **Los mobs cuestan FPS** (5 mallas por mob, el doble con sombras; 12 mobs son ~60 mallas más) y **no se midió en una PC modesta**. `CONFIG.maxMobs` es la perilla.
 26. **El instalador es solo para Windows de 64 bits, sin firmar y sin actualización automática.** La versión es siempre 0.1.0 (`package.json`): subirla cambia el nombre del instalador. Cada instalación nueva es una copia entera de 270 MB.
 27. **El primer arranque después de armar un .exe nuevo se colgó en esta PC** (sin ningún mensaje, quizá el antivirus revisándolo) y el segundo anduvo siempre. `tools/probar-empaquetado.js` reintenta solo.
+28. **El juego no se registra a sí mismo por la API de mods.** Lo propio vive en `config.js`, y `mods.js` mete lo de los mods en esas mismas tablas. Es más simple, pero si cambia la forma de `BLOCKS` o `ITEMS`, la API de mods puede cambiar y habría que subir `apiVersion`.
+29. **La API de mods es la primera versión y es chica:** bloques sólidos y opacos, sin acciones al apretar un bloque, sin modelos ni comportamientos propios de mobs, sin dependencias entre mods ni orden de carga configurable, sin sonidos ni interfaz. Lista completa en [07-mods.md](07-mods.md#límites-de-la-versión-1).
+30. **Los ids de mods son pocos**: 70 bloques (30–99) y 800 objetos (200–999) entre todos los mods, y 43 texturas en el atlas. Si se acaban, el mod que no entra falla con un mensaje.
+31. **Un mod cambia lo que genera el mundo:** un chunk ya generado y guardado no tiene sus minerales, y uno nuevo sí, así que **instalar un mod de generación en un mundo viejo deja costuras** (como cualquier cambio de generador, limitación 8). Quitar uno deja los bloques como "desconocidos".
 
 ## Pendientes de verificar
 
@@ -233,6 +246,7 @@ El 2026-11-19 se hicieron rondas de pruebas automáticas (detalle en [06-checkli
 - [ ] **Los números de las herramientas** (×2, ×4, ×6 y ×8, y sus usos) salen de Minecraft y no están ajustados a este juego. Tampoco que la piedra necesite pico: es una decisión que cambia el ritmo del comienzo.
 - [ ] **El aspecto y la sensación de la Fase 3:** los biomas, la oscuridad de las cuevas (`CONFIG.luzMinima`), las texturas de los minerales y el cactus, el agua que fluye y la cabaña. Se miraron en capturas, no en el juego real.
 - [ ] **Cuánto cuesta en una PC modesta:** la generación de un chunk pasó a incluir cuevas (en la PC de las pruebas, ~0,8 ms por chunk) y las mallas calculan la luz del cielo. No se midió en una PC chica.
+- [ ] **Un mod escrito por otra persona.** Las pruebas usan el ejemplo y mods rotos a propósito, todos hechos por la misma IA que hizo la API. Falta ver si la guía [07-mods.md](07-mods.md) alcanza para escribir uno desde cero sin leer el código, y probar un mod en el juego **instalado** (el empaquetado y los mods se probaron por separado).
 - [ ] **El aspecto y la sensación de los mobs:** cómo se ven y caminan el cerdo, la vaca y el zombi, el empujón y el destello rojo al golpearlos, cuánto cuesta matar a un zombi con la mano o con espada, y si 3 puntos por segundo es mucho. Se miraron solo en capturas (ver el checklist); los números salen de Minecraft.
 - [ ] **Cuántas cuevas y minerales:** los números (4% de aire, 15 hierros y 1 diamante por chunk) son una primera estimación.
 

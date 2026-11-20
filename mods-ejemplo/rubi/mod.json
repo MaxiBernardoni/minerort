@@ -1,0 +1,9 @@
+{
+  "id": "rubi",
+  "nombre": "Rubíes",
+  "version": "1.0.0",
+  "autor": "MiniCraft (ejemplo)",
+  "descripcion": "Un mineral de rubí en lo profundo, el rubí, un pico de rubí, y una gelatina que lo suelta a veces.",
+  "apiVersion": 1,
+  "main": "mod.js"
+}

@@ -38,6 +38,10 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 - **Agua que fluye:** si rompés un bloque que contenía agua, entra; una fuente en el aire cae en cascada. Se seca sola al sacarle la fuente.
 - **Cabañas** de tablones, raras, con una mesa de crafteo adentro.
 
+## Mods
+
+Los mods suman bloques, objetos, recetas, mobs, minerales y reacciones a eventos sin tocar el código del juego. Cada mod es una carpeta (`mod.json` + `mod.js`) que se copia a `%APPDATA%\minicraft\mods\` (el menú principal tiene un botón **Abrir carpeta de mods**). Hay un ejemplo completo en `mods-ejemplo/rubi/` y la guía para escribir uno en [docs/07-mods.md](docs/07-mods.md). **Un mod es código que corre dentro del juego: instalá solo mods de gente de confianza.**
+
 ## Mobs
 
 - **Cerdos y vacas** pasean por el césped; al pegarles huyen y sueltan **carne** (click derecho: se come, restaura 6 de hambre).
@@ -79,6 +83,7 @@ WASD mover · Espacio saltar (y nadar hacia arriba) · Shift correr · click izq
 | `src/player.js` | Estado compartido del jugador y del mouse |
 | `src/world.js` | Terreno, biomas, cuevas, minerales, árboles, cabañas, chunks y mallas 3D |
 | `src/agua.js` | Agua que fluye |
+| `src/mods.js`, `src/eventos.js`, `mods-main.js` | Los mods: carga, la API que reciben y los avisos del juego; `mods-ejemplo/` es un mod de ejemplo |
 | `src/fisica.js` | Choque de cajas contra los bloques (lo usan el jugador y los mobs) |
 | `src/mobs.js` | Cerdos, vacas y zombis: modelos, IA, aparición y combate |
 | `src/sky.js` | Cielo, sol/luna/estrellas, nubes y ciclo de día |
@@ -120,6 +125,7 @@ La carpeta [`docs/`](docs/README.md) explica el proyecto en detalle: [visión](d
 
 (Versión corta. El plan completo y ordenado está en [docs/04-roadmap.md](docs/04-roadmap.md).)
 
+0. Multijugador en red local (la otra mitad de la Fase 6; ya se decidió sumar `ws`).
 1. Antorchas y horno (para que las cuevas y el hierro tengan sentido completo), y más mobs.
 2. Menú de opciones y más cosas en el menú de mundos (renombrar, duplicar, elegir el modo).
 3. Armaduras y arcos.

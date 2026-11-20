@@ -10,6 +10,7 @@
 | [04-roadmap.md](04-roadmap.md) | ¿Qué se quiere construir y en qué orden? |
 | [05-proceso-vibecoding.md](05-proceso-vibecoding.md) | ¿Cómo se trabaja con la IA y entre dispositivos? Reglas y plantillas. |
 | [06-checklist-pruebas.md](06-checklist-pruebas.md) | ¿Qué se probó, qué anda y qué falta probar? |
+| [07-mods.md](07-mods.md) | ¿Cómo se escribe un mod? La API, con un ejemplo. |
 | [bitacora/](bitacora/) | ¿Qué se hizo en cada sesión? Un archivo por sesión, con prompts y lecciones. |
 
 Además, [`CLAUDE.md`](../CLAUDE.md) en la raíz es lo que Claude Code lee solo al empezar cada sesión.

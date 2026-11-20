@@ -1,9 +1,11 @@
 // Proceso principal de Electron: crea la ventana y se ocupa de los archivos de la partida.
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const { registrar } = require('./guardado-main.js');
+const { registrarMods } = require('./mods-main.js');
 
 registrar(ipcMain, () => app.getPath('userData'));   // %APPDATA%\minicraft en Windows
+registrarMods(ipcMain, () => app.getPath('userData'), shell);   // y los mods en %APPDATA%\minicraft\mods
 
 function createWindow() {
   const win = new BrowserWindow({

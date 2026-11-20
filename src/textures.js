@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { BLOCKS, ID } from './config.js';
 
-const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 20;
+const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 64;     // tiles 0-19: el juego; 20-62: para mods (tileNuevo); 63: "bloque desconocido"
 
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = NTILES * CELL;
@@ -376,6 +376,36 @@ paintSprite(ID.DIAMANTE, [
   '........o.......',
 ], { o: '#0c5a62', h: '#a4f6f0', m: '#38d6cc', d: '#1a9aa0', w: '#ffffff' });
 
+// ---------- para mods: tiles y sprites nuevos en tiempo de ejecucion ----------
+const TILE_DESCONOCIDO = NTILES - 1;
+paint(TILE_DESCONOCIDO, (x, y) => (((x >> 3) + (y >> 3)) % 2 ? [20, 20, 20] : [210, 40, 210]));   // damero magenta y negro
+let siguienteTile = 20;
+// Dibuja un tile nuevo en el atlas (fn(x, y) -> [r, g, b] en una grilla de 32x32) y devuelve su indice
+function tileNuevo(fn) {
+  if (siguienteTile >= TILE_DESCONOCIDO) throw new Error('no quedan tiles libres en el atlas (maximo ' + (TILE_DESCONOCIDO - 20) + ' para mods)');
+  const t = siguienteTile++;
+  paint(t, fn);
+  atlasTexture.needsUpdate = true;
+  return t;
+}
+// Texturas listas para usar (devuelven la fn de tileNuevo)
+const texturaRuido = (color, variacion = 0.18) => (x, y) => mulC(color, 1 - variacion + stretch(tfbm(x, y, 700)) * variacion * 2 + (rnd(x, y, 701) - 0.5) * variacion);
+const texturaMineral = color => mineral(150 + Math.floor(hash2(color[0], color[1], color[2]) * 90), mulC(color, 0.7), lerpC(color, [255, 255, 255], 0.45));
+// Sprite de objeto desconocido (un mod que falta): un signo de pregunta
+function spriteDesconocido(id) {
+  paintSprite(id, ['................', '................', '.....oooooo.....', '....oMMMMMMo....', '...oMMooooMMo...', '...oMMo..oMMo...', '.......oMMo.....', '......oMMo......', '.....oMMo.......', '.....oMMo.......', '................', '.....oMMo.......', '.....oMMo.......'], { o: '#201020', M: '#d028d0' });
+}
+// Sprite de una herramienta con los colores del mod: principal y claro son '#rrggbb'
+function herramientaSprite(id, tipo, colores) {
+  const p = {}, cab = CABEZAS[tipo];
+  if (!cab && tipo !== 'espada') throw new Error('herramienta desconocida: ' + tipo);
+  if (tipo === 'espada') { MATERIALES['mod' + id] = colores; espada(id, 'mod' + id); return; }
+  for (let i = 0; i < 10; i++) p[(2 + i) + ',' + (13 - i)] = MANGO;
+  cab.principal.forEach(([x, y]) => { p[x + ',' + y] = colores.principal; });
+  cab.claro.forEach(([x, y]) => { p[x + ',' + y] = colores.claro; });
+  spriteDePixeles(id, p);
+}
+
 const atlasTexture = new THREE.CanvasTexture(atlasCanvas);
 atlasTexture.magFilter = THREE.NearestFilter;
 atlasTexture.minFilter = THREE.NearestMipmapLinearFilter;
@@ -446,4 +476,5 @@ function makeBlockIcon(id) {
   return c;
 }
 
-export { hash2, lerp, smooth, tn, tileUV, tileAvg, atlasTexture, waterTexture, crackTextures, itemSprites, makeBlockIcon };
+export { hash2, lerp, smooth, tn, tileUV, tileAvg, atlasTexture, waterTexture, crackTextures, itemSprites, makeBlockIcon,
+         tileNuevo, TILE_DESCONOCIDO, texturaRuido, texturaMineral, paintSprite, spriteDesconocido, herramientaSprite };
