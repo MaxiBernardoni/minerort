@@ -1,0 +1,35 @@
+# Sesión 2026-11-19 · Fase 1 completa: salud, varios mundos y menú
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** terminar toda la Fase 1 del roadmap en una sola corrida. Quedaba el **menú principal con varios mundos** y **vida, hambre y daño de caída**.
+- **Prompt(s) clave:** *"Hacé de una corrida toda la fase 1"*. Sin preguntas intermedias: la IA tomó las decisiones de diseño que el roadmap dejaba abiertas y las anotó para que Max las revise.
+- **Resultado:** el juego tiene salud completa (corazones y muslos, caída, hambre, regeneración, inanición, comer, muerte y reaparición), manzanas que sueltan las hojas, un menú principal para elegir, crear y borrar mundos, y "Guardar y volver al menú" en la pausa. `npm test` pasó de 33 a **51 pruebas**. Commit: *(pendiente, ver abajo)*.
+- **Decisiones que tomó la IA (todas fáciles de cambiar):**
+  - **Comida mínima:** una sola, la manzana, que sueltan las hojas (3%). Sin una comida el hambre habría sido solo un castigo. Es el primer "objeto que no es bloque" y se dibuja como cubo hasta que haya objetos planos (Fase 2).
+  - **Al morir se conserva el inventario** y se reaparece en el punto de partida. **La inanición no mata** (se frena en 1 punto). **En creativo** no hay daño ni hambre y los valores se conservan.
+  - **Los números de la salud salen de Minecraft** (caída `ceil(distancia − 3)`, regeneración cada 4 s, etc.) y no están ajustados a este juego.
+  - **Varios mundos = una carpeta por mundo** (`mundos\<id>\`), y el menú **recarga la página** con `?mundo=...` en vez de limpiar el estado a mano: cada mundo arranca de cero y no hay restos del anterior.
+  - **El botón "Nuevo mundo" de la sesión anterior se reemplazó** por el menú (crear mundo con nombre y semilla). Las entradas anteriores de la bitácora describen ese botón, que ya no existe.
+  - **Seguridad:** el id de mundo llega desde la página, así que `guardado-main.js` solo acepta `[a-z0-9-]`. Sin eso, la página podría leer o borrar carpetas fuera de la de mundos.
+  - **Migración:** la partida única de la versión anterior se mueve sola a un mundo llamado "Mi mundo".
+- **Qué funcionó:**
+  - **Leer `game.js` antes de tocar nada** y armar un plan que evitara dependencias circulares y reasignaciones entre módulos (`salud.js` y `menu.js` nuevos, `player.js` ampliado).
+  - **Sabotear el código a propósito en 11 lugares nuevos** antes de dar las pruebas por buenas. Las 51 pasaron a la primera, y eso dio desconfianza. Se probó con cambios válidos: caída que no duele, inanición que mata, daño en creativo, correr sin hambre, manzana puesta como bloque, hojas sin manzana, reaparecer sin volver al inicio, no guardar la vida, ids sin validar, sin migración y nombres interpretados como HTML. Las 11 se detectaron.
+  - **Probar el `main.js` real** con un script temporal y una carpeta temporal: crear un mundo por la dirección, cerrar la ventana, reabrir y recuperar todo, y abrir el menú.
+- **Qué falló o hubo que corregir:**
+  - **El primer intento de sabotaje no sabotó nada:** el script usaba mal los argumentos de `node -e` (una posición corrida). Se notó porque cada intento mostraba un error de archivo no encontrado y la verificación final decía que nada había cambiado.
+  - **Dos sabotajes fallaban "feo":** uno colgó la corrida 5 minutos esperando una recarga de página que nunca llegaba, y otro la abortó con un error técnico en vez de marcar una prueba como fallida. Se mejoró el runner (espera con tope de 20 s y errores aislados por bloque) y se repitieron.
+  - **Un error que la IA encontró con el `main.js` real:** cerrar la ventana desde el menú esperaba 3 segundos, porque `main.js` espera la confirmación de guardado y el menú no la daba. Ahora el menú responde enseguida (27 ms).
+  - **Un error que la IA encontró pensando, antes de probarlo:** una partida de la versión anterior no tiene vida ni hambre, y se la habría tratado como "murió". Ahora arranca con la salud llena.
+  - **Un cambio de diseño a mitad de camino:** en creativo la vida se reseteaba a 20, lo que impedía probar que la salud se guarda. Ahora los valores se conservan en creativo (como en Minecraft).
+- **Lección:** al hacer mucho de una vez, **las pruebas que pasan a la primera no alcanzan: hay que hacerlas fallar a propósito**, y conviene que cada falla sea legible (que diga qué se rompió) y no cuelgue la corrida. Además, probar el programa real, no solo la versión de pruebas, encontró un error que ninguna prueba cubría.
+- **Quedó pendiente:**
+  - [ ] **Commitear:** hay tres tandas sin commit (guardado en disco, botón Nuevo mundo que luego se reemplazó, y esta).
+  - [ ] **Jugar a mano con `npm start`.** Ojo: usa tus mundos reales. Qué mirar: cómo se ven los corazones, los muslos, el menú, el cartel de muerte y la manzana; y si el daño por caída, el hambre y la regeneración se sienten bien.
+  - [ ] **Ajustar los números de la salud** según cómo se sienta.
+  - [ ] Objetos planos (la manzana es un cubo rojo) y separar el registro de ítems del de bloques (Fase 2).
+  - [ ] Renombrar y duplicar mundos, elegir el modo al crear y un menú de opciones.
+  - [ ] Guardar los objetos soltados en el suelo.
+  - [ ] Una semilla aleatoria puede dar un inicio en el agua.
+  - [ ] Actualizar Three.js.
+  - [ ] Medir FPS en una PC modesta.

@@ -8,20 +8,28 @@
 Desde el 2026-11-19 la mayor parte de este checklist se verifica sola con un comando:
 
 ```powershell
-npm test                  # corre las 20 pruebas (≈15 segundos)
+npm test                  # corre las 51 pruebas (≈30 segundos)
 npm test -- hora          # solo las pruebas cuyo nombre contiene "hora" (admite expresiones regulares)
 ```
 
 - **Cómo funciona:** `test/run.js` abre el juego real en Electron **sin mostrar ventana** (modo `offscreen`), ejecuta `test/pruebas.js` adentro de la página y sale con código 0 si todo pasó o 1 si algo falló. No instala nada: usa el Electron del proyecto.
-- **Qué cubre:** arranque como módulos, cuadros, terreno estable (misma semilla = mismas alturas), caer, saltar, paredes, volar, tercera persona, sombras, romper/poner/recoger bloques, modo creativo, bordes de chunk, todo el inventario, tirar objetos, rueda del mouse, hora y noche, cambio de calidad, nadar bajo el agua, persistencia en memoria al alejarse y que no haya errores en la consola.
-- **Se comprobó que detecta roturas** sabotando el código a propósito: sin guardar chunks, con un export faltante y con otra velocidad de salto. Las tres veces falló con un mensaje claro y código 1.
+- **Qué cubre:**
+  - **El juego:** arranque como módulos, cuadros, terreno estable (misma semilla = mismas alturas), caer, saltar, paredes, volar, tercera persona, sombras, romper/poner/recoger bloques, modo creativo, bordes de chunk, todo el inventario, tirar objetos, rueda del mouse, hora y noche, cambio de calidad, nadar bajo el agua y persistencia en memoria al alejarse.
+  - **La salud:** daño por caída (3 bloques no duelen, 8 quitan 5, al agua no duele), creativo sin daño y con la barra oculta, la barra con corazones y muslos llenos/medios/vacíos, hambre por correr y saltar (y no por caminar), agotamiento → saturación → hambre, regeneración, inanición que baja a 1 y no mata, comer manzanas (solo con hambre, sin ponerlas como bloque), manzanas de las hojas, y morir y reaparecer (cartel, causa, inventario conservado, vuelve al inicio).
+  - **Los mundos:** guardar y reiniciar, archivo dañado, mundo nuevo, menú (lista, crear con semilla y nombre, volver, borrar con confirmación), nombres con HTML mostrados como texto, ids de mundo peligrosos rechazados, migración de la partida anterior y que no haya errores en la consola.
+- **Las fases de reinicio y del menú:** la última prueba de `pruebas.js` ("guardar: …") deja un mundo conocido guardado (se juega en el mundo de pruebas `?mundo=prueba`). Después `test/run.js` **reinicia el juego** y corre `test/pruebas-reinicio.js` tres veces: con el archivo bien (la partida vuelve), con el principal dañado (se usa el respaldo) y con los dos dañados (empieza un mundo nuevo sin romperse). Sigue `test/pruebas-menu.js`: abre el menú, crea un mundo por el formulario, vuelve al menú, borra el mundo con confirmación y migra una partida de la versión anterior. Cada paso que recarga la página espera la recarga de verdad. Si filtrás con `npm test -- algo`, estas fases solo corren si el filtro incluye "guardar".
+- **Los mundos de las pruebas viven en una carpeta temporal**, así que `npm test` nunca toca tus mundos reales.
+- **Se comprobó que detecta roturas** sabotando el código a propósito, en 20 lugares distintos a lo largo del trabajo (los más recientes: la caída que no duele, la inanición que mata, el daño en creativo, correr sin hambre, la manzana que se pone como bloque, las hojas sin manzana, reaparecer sin volver al inicio, no guardar la vida, no validar los ids de mundo, no migrar la partida anterior y mostrar el nombre como HTML). Todas fallaron con un mensaje claro y código 1. Si un cambio falla de forma fea (colgado o con un error técnico en vez de una prueba marcada), mejorá el runner.
+- **Cómo sabotear sin riesgo:** guardá una copia del archivo con `cp` antes y restaurala con `cp`, verificando con `cmp` (no uses `git checkout` si el archivo todavía no está en git). En archivos del proceso principal (`main.js`, `guardado-main.js`, `preload.js`) el sabotaje tiene que ser un cambio válido: uno que rompa la sintaxis hace que Electron muestre un diálogo de error en la pantalla y deje colgada la prueba.
 - **Cómo agregar una prueba:** en `test/pruebas.js`, sumar `await prueba('nombre', async () => { … })` y usar `afirmar(condición, 'mensaje')`. Casi todas empiezan con `await arena()`, que arma una plataforma de piedra a y=60 y deja inventario, hora y calidad en un estado conocido.
 - **Si cambiás la generación del terreno a propósito:** la prueba "el terreno es estable" va a fallar; actualizá la lista de alturas de referencia.
 
 **Lo que `npm test` no puede ver:**
 
-- El aspecto: no compara imágenes, así que un cambio de colores, texturas o sombras pasa sin que nadie se entere.
+- El aspecto: no compara imágenes, así que un cambio de colores, texturas o sombras pasa sin que nadie se entere. Eso incluye **cómo se ven los corazones, los muslos, el menú, el cartel de muerte, el destello rojo y la manzana**: las pruebas comprueban que existen y cambian, no que se vean bien.
+- La **sensación** de la salud: si la caída, el hambre y la regeneración se sienten bien. Los números salen de Minecraft y no están ajustados.
 - Mirar con el mouse real, la pausa con Esc y el bloqueo de puntero. Las pruebas ignoran los eventos `pointerlockchange` y manejan ese estado a mano.
+- El cierre de la ventana real: `npm test` usa su propio `main`, así que el código de `main.js` que guarda al cerrar no está cubierto. Se probó con un script temporal que arranca el `main.js` real con una carpeta temporal (crear un mundo por la dirección, cerrar la ventana en 61 ms, reabrir y recuperar la torre, las manzanas, la vida y el hambre; abrir el menú y cerrar desde ahí en 27 ms). Conviene repetirlo si se toca `main.js`, `preload.js` o el cierre.
 - La sensación de juego y el rendimiento en una PC modesta (el modo `offscreen` no sirve para medir FPS).
 - Las animaciones (golpe al aterrizar, balanceo, grietas, partículas) solo se ejecutan, no se evalúan.
 
@@ -46,7 +54,7 @@ La próxima vez conviene repetir esta lista completa después de cambios grandes
 | Chunks nuevos al viajar lejos, sin tirones | ✅ peor cuadro 34 ms |
 | Chunks lejanos se descargan | ✅ |
 | **Lo construido se conserva al alejarse y volver** | ✅ Antes del arreglo una torre de 4 bloques desaparecía; después se conservó la torre y un hoyo cavado, y solo se guardó el chunk modificado. |
-| Lo construido se conserva al cerrar y abrir el juego | ⚠️ No: no hay guardado en disco todavía. |
+| Lo construido se conserva al cerrar y abrir el juego | ✅ Con el guardado en disco (probado con `npm test` y a mano con el `main.js` real). |
 | Poner/romper bloques en el borde de un chunk, sin errores | ✅ |
 | Agua: nadar, pantalla azul bajo el agua, subir con Espacio | ✅ |
 | Agua: velocidad al nadar adelante | ⬜ medición no concluyente |

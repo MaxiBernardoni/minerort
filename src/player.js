@@ -7,6 +7,12 @@ import * as THREE from 'three';
 const player = {
   pos: new THREE.Vector3(), vel: new THREE.Vector3(),
   yaw: 0, pitch: 0, onGround: false, fly: false,
+  // salud (la logica esta en salud.js): vida y hambre van de 0 a 20 (10 corazones y 10 muslos)
+  vida: 20, hambre: 20, saturacion: 5, agotamiento: 0, muerto: false,
+  // caidas: fallMax = punto mas alto desde que dejo el suelo; lastY detecta teletransportes
+  fallMax: 0, lastY: 0,
+  // punto de reaparicion del mundo (lo calcula game.js); ajustarSpawn = subirlo si quedo dentro de un bloque
+  spawn: null, ajustarSpawn: false,
 };
 const mouse = { left: false, right: false };
 

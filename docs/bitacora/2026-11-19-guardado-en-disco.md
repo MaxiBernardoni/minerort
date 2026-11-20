@@ -1,0 +1,25 @@
+# Sesión 2026-11-19 · Guardado en disco
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** que la partida sobreviva al cerrar el juego. Primera tarea de la Fase 1 del roadmap.
+- **Prompt(s) clave:** *"Sí, guardado en disco"*, respuesta a la propuesta que la IA hizo al cerrar la sesión de pruebas.
+- **Resultado:** la partida se guarda sola cada 30 s y al cerrar la ventana, y se retoma al abrir. Guarda los chunks modificados, el inventario, el modo, la hora y la posición. Nuevos: `src/guardado.js`, `guardado-main.js`, `preload.js`; cambiados `main.js` y el arranque de `game.js`. 28 pruebas pasan (antes 20). Commit: *(pendiente)*.
+- **Decisiones de diseño que tomó la IA:**
+  - Los archivos los escribe el proceso principal de Electron y la página se comunica por un puente mínimo (`preload.js`) que solo expone tres funciones. La página sigue sin acceso a Node ni a archivos.
+  - Solo se guardan los chunks **modificados**; el resto se regenera de la semilla. Por eso el archivo pesa unos 800 bytes en las pruebas, pero tiene un costo: si cambia el generador, las partidas viejas quedan con costuras.
+  - Escritura atómica (archivo temporal + renombrar) y un respaldo que es "el último estado que se pudo abrir", para que un archivo dañado no destruya la partida.
+  - Las pruebas usan una carpeta temporal para no tocar la partida real de Max.
+- **Qué funcionó:**
+  - Probar el flujo completo con el **`main.js` real**, no solo con el de las pruebas: cerrar la ventana crea el archivo, reabrir devuelve la torre y el inventario. Las pruebas automáticas no cubren ese tramo, así que se hizo a mano con un script temporal y una carpeta temporal.
+  - Pruebas de reinicio de verdad: el runner reinicia el juego y verifica que la partida vuelve, con el archivo bien, con el archivo dañado (usa el respaldo) y con ambos dañados (mundo nuevo).
+  - Sabotear la lógica para ver fallar las pruebas (sin guardar el inventario, sin cargar chunks, sin usar el respaldo).
+- **Qué falló o hubo que corregir:**
+  - **Error de la IA al sabotear:** para restaurar usé `git checkout` sobre un archivo que todavía no estaba en git, así que no restauró nada y uno de los sabotajes quedó activo en las corridas siguientes. Se notó porque el sistema avisó que el archivo había cambiado; se restauró a mano y se verificó línea por línea, y se repitió la batería completa. Cada sabotaje igual mostraba su falla propia, así que las conclusiones se sostuvieron, pero fue un descuido.
+  - Las 28 pruebas pasaron a la primera, lo que dio desconfianza. Por eso se sabotearon antes de darlas por buenas.
+- **Lección:** para restaurar después de sabotear hay que **guardar una copia del archivo antes** (no confiar en git si el archivo es nuevo) y verificar con un `grep` que el sabotaje ya no está. Y cuando todas las pruebas pasan a la primera, conviene hacerlas fallar a propósito.
+- **Quedó pendiente:**
+  - [ ] Jugar a mano con `npm start`: cerrar con la X, volver a abrir y mirar que todo esté. **Ojo: se usa la partida real**; está en `%APPDATA%\minicraft\`.
+  - [ ] Guardar los objetos soltados en el suelo (hoy desaparecen al reabrir).
+  - [ ] Varios mundos y un menú principal para elegirlos o empezar uno nuevo (hoy hay que borrar los archivos a mano).
+  - [ ] Decidir qué hacer con las partidas viejas si cambia el generador de terreno.
+  - [ ] Actualizar Three.js.

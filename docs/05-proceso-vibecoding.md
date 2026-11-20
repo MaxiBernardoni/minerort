@@ -94,3 +94,6 @@ Ver la carpeta [`bitacora/`](bitacora/). Sesiones registradas hasta ahora:
 - [2026-11-19 · El mundo conserva los cambios (en memoria)](bitacora/2026-11-19-mundo-persistente-en-memoria.md)
 - [2026-11-19 · Migración a módulos ES](bitacora/2026-11-19-modulos-es.md)
 - [2026-11-19 · Pruebas automáticas (`npm test`)](bitacora/2026-11-19-pruebas-automaticas.md)
+- [2026-11-19 · Guardado en disco](bitacora/2026-11-19-guardado-en-disco.md)
+- [2026-11-19 · Botón "Nuevo mundo"](bitacora/2026-11-19-nuevo-mundo.md) (reemplazado después por el menú)
+- [2026-11-19 · Fase 1 completa: salud, varios mundos y menú](bitacora/2026-11-19-fase-1-completa.md)

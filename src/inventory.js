@@ -297,6 +297,8 @@ function dropFromPlayer(id, count) {
 function dropForBlock(b, x, y, z) {
   if (creative) return;
   const def = BLOCKS[b];
+  if (def.extra && Math.random() <= def.extra.chance)                // objeto extra (manzana de las hojas), se tira aparte
+    spawnDrop(def.extra.id, 1, x + 0.5, y + 0.5, z + 0.5, (Math.random() - 0.5) * 2, 2.5, (Math.random() - 0.5) * 2);
   if (def.dropChance !== undefined && Math.random() > def.dropChance) return;
   spawnDrop(def.drop || b, 1, x + 0.5, y + 0.5, z + 0.5, (Math.random() - 0.5) * 2, 2.5, (Math.random() - 0.5) * 2);
 }
@@ -343,4 +345,4 @@ if (!creative) CONFIG.startKit.forEach(([id, n]) => invAdd(id, n));
 else ITEM_IDS.forEach((id, i) => { inventory[i] = { id, count: MAX_STACK }; });
 refreshInventoryUI();
 
-export { inventory, invAdd, heldId, consumeHeld, selected, selectSlot, invOpen, openInventory, closeInventory, hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop };
+export { inventory, invAdd, heldId, consumeHeld, selected, creative, selectSlot, invOpen, openInventory, closeInventory, hotkeySwap, toast, lockPointer, setCreative, dropForBlock, updateDrops, drops, spawnDrop };

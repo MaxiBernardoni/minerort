@@ -1,0 +1,24 @@
+# Sesión 2026-11-19 · Botón "Nuevo mundo"
+
+- **Dispositivo:** sin dato (completar).
+- **Objetivo:** que se pueda empezar un mundo nuevo sin borrar archivos a mano. Segunda tarea de la Fase 1 del roadmap, en su versión mínima (sin varios mundos todavía).
+- **Prompt(s) clave:** *"Avanzá directo, no hace falta commitear todavía"*, tras cerrar la sesión de guardado. La IA eligió la tarea siguiente del roadmap sin preguntar: la limitación que ella misma había documentado ("todavía no hay un botón para eso").
+- **Resultado:** botón **Nuevo mundo** en la pantalla de pausa. Primer click pide confirmar, segundo borra la partida y recarga el juego con una semilla aleatoria. 33 pruebas pasan (antes 28). Commit: *(pendiente, y además sigue sin commitear la sesión de guardado en disco)*.
+- **Decisiones de diseño que tomó la IA:**
+  - La semilla nueva viaja en la dirección de la página (`?semilla=N`) en vez de guardarla en un archivo: es lo más corto y no hay estado que limpiar. Si hay una partida guardada, el parámetro se ignora.
+  - Mientras se borra, `bloqueado = true` impide que el autoguardado o el guardado al cerrar vuelvan a escribir la partida vieja.
+  - Se dejó afuera elegir entre varios mundos, que pide una carpeta por mundo y una interfaz de verdad.
+- **Qué funcionó:**
+  - Una quinta fase en `npm test` que aprieta el botón dos veces, espera la recarga y comprueba semilla, archivos borrados e inventario inicial.
+  - Sabotear las pruebas para verlas fallar, esta vez con copias de respaldo previas y verificación con `cmp` (se aprendió en la sesión anterior).
+- **Qué falló o hubo que corregir:**
+  - **Un diálogo de error apareció en la pantalla de Max** durante la sesión: "A JavaScript error occurred in the main process, SyntaxError en guardado-main.js". **Lo causó la IA, no era un bug del proyecto.** Un sabotaje de prueba dejó un `for` sin cuerpo en un archivo del proceso principal; Electron muestra un diálogo modal en esos casos y dejó colgada la corrida. La IA lo reconoció, frenó la corrida, restauró el archivo desde la copia, verificó que no quedaran marcas de sabotaje y repitió los tres sabotajes con cambios válidos.
+  - Las 33 pruebas pasaron a la primera, y otra vez se sabotearon antes de darlas por buenas.
+- **Lección:** un sabotaje en un archivo del **proceso principal** de Electron puede mostrar ventanas en la pantalla del usuario y colgar la prueba. Hay que sabotear con cambios que alteren el comportamiento sin romper la sintaxis. Quedó escrito en `CLAUDE.md` y en el checklist de pruebas.
+- **Quedó pendiente:**
+  - [ ] **Commitear:** hay dos sesiones de trabajo sin commit (guardado en disco y Nuevo mundo).
+  - [ ] Probar a mano con `npm start`: Esc, botón Nuevo mundo, confirmar. **Ojo: borra tu partida real.**
+  - [ ] Varios mundos y elegir entre ellos.
+  - [ ] Revisar qué pasa con semillas que dan un punto de partida en el agua (ver limitación 11 en [02-estado-actual.md](../02-estado-actual.md)).
+  - [ ] Guardar los objetos soltados en el suelo.
+  - [ ] Actualizar Three.js.

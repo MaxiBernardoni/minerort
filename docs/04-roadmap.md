@@ -39,15 +39,17 @@ Preparar el terreno para que el resto no se rompa. No agrega nada visible.
 
 | Función | Depende de | Qué toca |
 |---|---|---|
-| **Guardar/cargar mundo** | Fase 0 | `world.js` (serializar chunks modificados y semilla), `inventory.js` (guardar inventario), `main.js` (acceso a archivos desde Electron). |
-| **Menú principal** (nuevo mundo / cargar) | Guardado | `index.html` y un archivo nuevo de UI. |
-| **Vida, hambre, daño de caída** | — | `game.js` y UI en `index.html`. Prepara a los mobs. |
+| ✅ **Guardar/cargar mundo (hecho 2026-11-19)** | Fase 0 | Automático, una carpeta por mundo. Ver [Guardado](02-estado-actual.md#guardado) y [arquitectura](03-arquitectura.md#guardado-en-disco). Falta guardar los objetos soltados. |
+| ✅ **Menú principal y varios mundos (hecho 2026-11-19)** | Guardado ✅ | Elegir, crear y borrar mundos; volver al menú desde la pausa. Ver [Mundos y menú](02-estado-actual.md#mundos-y-menú-principal). Faltan: renombrar y duplicar mundos, elegir el modo al crear, y un menú de opciones. |
+| ✅ **Vida, hambre, daño de caída (hecho 2026-11-19)** | — | Con muerte, reaparición y una comida mínima (la manzana). Ver [Salud](02-estado-actual.md#salud-solo-en-supervivencia). Los números salen de Minecraft y falta ajustarlos jugando. Prepara a los mobs. |
+
+> **La Fase 1 está completa.** Decisiones que tomó la IA donde el roadmap no decía nada, todas fáciles de cambiar: la comida es solo la manzana (sin ella el hambre sería solo un castigo); al morir se conserva el inventario; la inanición no mata; el menú recarga la página en vez de reiniciar el estado a mano.
 
 ### Fase 2 · Crafteo y herramientas
 
 | Función | Depende de | Qué toca |
 |---|---|---|
-| **Más bloques y objetos que no son bloques** (palos, herramientas) | Un registro de ítems distinto del de bloques | `config.js`, `textures.js`, `inventory.js`. Hoy un ítem es solo un id de bloque. |
+| **Más bloques y objetos que no son bloques** (palos, herramientas) | Un registro de ítems distinto del de bloques | `config.js`, `textures.js`, `inventory.js`. Hoy un ítem es un id de `BLOCKS`; la **manzana** (id 11, con `food`) ya es un objeto que no se pone, pero se dibuja como cubo. Hace falta un modelo plano para objetos y separar el registro de ítems del de bloques. |
 | **Mesa de crafteo y recetas** | Ítems | `inventory.js` y UI. |
 | **Herramientas y durabilidad** | Ítems | `game.js` (`updateMining` usa solo `hardness`), `config.js`. |
 | **Mejor inventario** (ver abajo) | Ítems | `inventory.js`. |
@@ -151,6 +153,8 @@ Mitigaciones posibles cuando haga falta: generar chunks en un `Worker`, limitar 
 | 2026-11-19 | Los mods los harán otras personas. |
 | 2026-11-19 | "Mejor inventario" = más parecido al de Minecraft original. |
 | 2026-11-19 | El multijugador usa la opción más factible (propuesta: anfitrión + LAN primero). |
+| 2026-11-19 | *(decidido por la IA, a revisar)* Comida mínima: solo la manzana. Al morir se conserva el inventario. La inanición no mata. |
+| 2026-11-19 | *(decidido por la IA, a revisar)* Varios mundos: cada uno en su carpeta, el menú recarga la página para elegir. |
 
 ## Preguntas abiertas
 

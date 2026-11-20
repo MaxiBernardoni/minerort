@@ -15,6 +15,9 @@ import {
 } from './inventory.js';
 import { player, mouse, lookDir } from './player.js';
 import { applyQuality } from './quality.js';
+import { gastar, comer, alAterrizar, actualizarSalud, resetearSalud, danar, curar, reaparecer } from './salud.js';
+import { mundoId, cargarPartida, guardarPartida, iniciarGuardado } from './guardado.js';
+import { mostrarMenu } from './menu.js';
 
 // Contorno del bloque apuntado
 const highlight = new THREE.LineSegments(
@@ -63,6 +66,10 @@ function physicsStep(dt) {
   if (len > 0) { wx /= len; wz /= len; }
 
   const p = player.pos;
+  if (player.ajustarSpawn) {                                // reaparecio dentro de un bloque (algo construido): subir hasta quedar libre
+    while (collides(p.x, p.y, p.z) && p.y < H) p.y += 1;
+    player.ajustarSpawn = false; player.fallMax = player.lastY = p.y;
+  }
   const inWater = !player.fly && getBlock(Math.floor(p.x), Math.floor(p.y + 0.4), Math.floor(p.z)) === WATER;
   const headWater = getBlock(Math.floor(p.x), Math.floor(p.y + 1.6), Math.floor(p.z)) === WATER;
   player.inWater = inWater; player.headWater = headWater;
@@ -85,7 +92,7 @@ function physicsStep(dt) {
     if (k.Space) player.vel.y = headWater ? Math.min(player.vel.y + 34 * dt, 3.6) : Math.max(player.vel.y, 6.5);
   } else {
     player.vel.y = Math.max(player.vel.y - CONFIG.gravity * dt, -40);
-    if (k.Space && player.onGround) player.vel.y = CONFIG.jumpSpeed;
+    if (k.Space && player.onGround) { player.vel.y = CONFIG.jumpSpeed; gastar(sprint ? 0.2 : 0.05); }
   }
 
   const wasOnGround = player.onGround, prevVy = player.vel.y;
@@ -94,6 +101,18 @@ function physicsStep(dt) {
   moveAxis('z', player.vel.z * dt);
   moveAxis('y', player.vel.y * dt);
   if (player.onGround && !wasOnGround && prevVy < -9) view.dip = Math.min(0.3, (-prevVy - 8) * 0.03 + 0.05);   // golpe al aterrizar
+
+  // hambre: correr y nadar cansan (caminar no)
+  if (!player.fly && len > 0) {
+    const dxz = Math.hypot(player.vel.x, player.vel.z) * dt;
+    if (inWater) gastar(0.015 * dxz); else if (sprint && wasOnGround) gastar(0.1 * dxz);
+  }
+  // caidas: fallMax es lo mas alto que estuvo desde que dejo el suelo; al aterrizar, la diferencia es lo que cayo
+  if (Math.abs(player.pos.y - player.lastY) > 2) player.fallMax = player.pos.y;     // salto demasiado grande en un paso: se teletransporto
+  player.lastY = player.pos.y;
+  if (player.fly || inWater) player.fallMax = player.pos.y;                         // volando o en el agua no se acumula caida
+  else if (player.onGround) { if (!wasOnGround) alAterrizar(player.fallMax - player.pos.y); player.fallMax = player.pos.y; }
+  else player.fallMax = Math.max(player.fallMax, player.pos.y);
 
   if (player.pos.y < -20) respawn();
 }
@@ -195,7 +214,7 @@ const mining = { x: 0, y: 0, z: 0, p: 0, active: false, delay: 0 };
 
 function updateMining(dt) {
   mining.delay = Math.max(0, mining.delay - dt);
-  const can = locked && mouse.left && target && target.y > 0 && mining.delay <= 0;
+  const can = locked && !player.muerto && mouse.left && target && target.y > 0 && mining.delay <= 0;
   if (!can) { mining.active = false; mining.p = 0; crackMesh.visible = false; hand.mining = false; return; }
   if (!mining.active || mining.x !== target.x || mining.y !== target.y || mining.z !== target.z) {
     mining.active = true; mining.x = target.x; mining.y = target.y; mining.z = target.z; mining.p = 0;
@@ -210,14 +229,22 @@ function updateMining(dt) {
     spawnBreakParticles(mining.x, mining.y, mining.z, b);
     setBlock(mining.x, mining.y, mining.z, 0);
     dropForBlock(b, mining.x, mining.y, mining.z);          // suelta el objeto (inventory.js)
+    gastar(0.005);                                          // romper cansa un poquito
     mining.active = false; mining.p = 0; mining.delay = 0.18;
     crackMesh.visible = false;
   }
 }
 
+// Devuelve los segundos hasta poder repetir (comer es mas lento que poner un bloque)
 function placeBlock() {
   const id = heldId();
-  if (!target || !id) return;                               // mano vacia: no hay nada para poner
+  if (!id) return 0.22;                                     // mano vacia: no hay nada para poner
+  const comida = BLOCKS[id].food;
+  if (comida) {                                             // la comida no se pone: se come (solo si hay hambre)
+    if (comer(comida)) { consumeHeld(); startSwing(); }
+    return 0.8;
+  }
+  if (!target) return 0.22;
   const px = target.x + target.nx, py = target.y + target.ny, pz = target.z + target.nz;
   const here = getBlock(px, py, pz);
   if (py < 0 || py >= H || (here !== 0 && here !== WATER)) return;
@@ -240,10 +267,11 @@ function frame(now) {
   renderer.info.reset();
   updateChunks(player.pos.x, player.pos.z, 4, 3, 5);
 
-  if (locked && chunks.has(chunkKey(Math.floor(player.pos.x / CS), Math.floor(player.pos.z / CS)))) {
+  if (locked && !player.muerto && chunks.has(chunkKey(Math.floor(player.pos.x / CS), Math.floor(player.pos.z / CS)))) {
     const steps = Math.ceil(dt / (1 / 90));
     for (let i = 0; i < steps; i++) physicsStep(dt / steps);
   }
+  actualizarSalud(locked ? dt : 0);                         // vida, hambre y la barra (en pausa el tiempo no corre)
   const speedXZ = Math.hypot(player.vel.x, player.vel.z);
 
   // camara: balanceo al caminar, golpe al aterrizar, FOV mas ancho al correr
@@ -274,7 +302,7 @@ function frame(now) {
 
   updateMining(dt);
   placeCooldown -= dt;
-  if (locked && !mouse.left && mouse.right && placeCooldown <= 0) { placeBlock(); placeCooldown = 0.22; }
+  if (locked && !player.muerto && !mouse.left && mouse.right && placeCooldown <= 0) placeCooldown = placeBlock() || 0.22;
 
   updateParticles(dt);
   updateDrops(dt);
@@ -322,24 +350,39 @@ Calidad ${CONFIG.quality} · res ${Math.round(renderScale * 100)}% · ${renderer
 }
 
 // ---------- Inicio ----------
-setTimeout(() => {
-  // Buscar un punto de aparicion sobre cesped (no en la arena de los valles)
+// Punto de aparicion del mundo: tierra firme (no la arena de los valles), buscando en diagonal desde (8, 8).
+// Si no hay en 120 bloques cae en (8, 8) aunque sea agua.
+function buscarSpawn() {
   let bx = 8, bz = 8;
   for (let r = 0; r < 120; r += 4) {
     const x = 8 + r, z = 8 + Math.floor(r / 2);
     if (heightAt(x, z) > CONFIG.seaLevel + 3) { bx = x; bz = z; break; }
   }
-  const sx = bx + 0.5, sz = bz + 0.5;
+  return { x: bx + 0.5, y: heightAt(bx, bz) + 1.01, z: bz + 0.5 };
+}
+
+setTimeout(async () => {
+  if (window.guardado && !mundoId) { await mostrarMenu(); return; }   // sin mundo elegido: menu (elegir, crear, borrar); jugar recarga con ?mundo=
+  const hayPartida = await cargarPartida();             // antes de generar chunks: puede cambiar la semilla y trae los chunks modificados
   applyQuality(CONFIG.quality);
-  updateChunks(sx, sz, 1e9, 1e9, 1e9);                  // carga inicial completa
-  player.pos.set(sx, heightAt(bx, bz) + 1.01, sz);
+  if (!player.spawn) player.spawn = buscarSpawn();      // la partida guardada puede traer el suyo
+  if (hayPartida) {
+    updateChunks(player.pos.x, player.pos.z, 1e9, 1e9, 1e9);   // el jugador ya quedo donde estaba
+  } else {
+    const s = player.spawn;
+    updateChunks(s.x, s.z, 1e9, 1e9, 1e9);              // carga inicial completa
+    player.pos.set(s.x, s.y, s.z);
+  }
+  player.fallMax = player.lastY = player.pos.y;
+  iniciarGuardado();
   document.getElementById('status').textContent = '';
   document.getElementById('playBtn').style.display = 'block';
   requestAnimationFrame(frame);
 }, 30);
 
 // Util para experimentar desde la consola (F12)
-window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, getBlock, setBlock, heightAt, scene, camera, setTime,
+window.mc = { CONFIG, BLOCKS, player, chunks, savedChunks, chunkKey, guardarAhora: guardarPartida, mundoId, getBlock, setBlock, heightAt, scene, camera, setTime,
               renderer, spawnBreakParticles, hand, mining, startSwing, selectSlot, sun, mouse,
               applyQuality, applyRenderScale, inventory, invAdd, openInventory, closeInventory, setThirdPerson, drops, spawnDrop, setCreative,
+              salud: { danar, curar, comer, gastar, actualizar: actualizarSalud, resetear: resetearSalud, reaparecer },
               setLocked: v => { locked = v; } };

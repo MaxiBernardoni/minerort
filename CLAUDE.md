@@ -29,7 +29,7 @@ Clon de Minecraft en Electron + Three.js, hecho como experimento de aprendizaje 
 ```
 npm install    # solo la primera vez
 npm start      # jugar
-npm test       # las pruebas automáticas (≈15 s, sin mostrar ventana); `npm test -- hora` corre solo algunas
+npm test       # las pruebas automáticas (≈30 s, sin mostrar ventana); `npm test -- hora` corre solo algunas
 ```
 
 F12 abre la consola. `window.mc` expone el estado del juego.
@@ -48,7 +48,13 @@ F12 abre la consola. `window.mc` expone el estado del juego.
 
 ## Limitaciones conocidas que afectan a cualquier cambio
 
-- Los cambios al mundo se conservan en memoria (`savedChunks` en `world.js`) pero **se pierden al cerrar el juego**: no hay guardado en disco.
+- **Hay varios mundos y se guardan solos** (cada 30 s, al cerrar y al volver al menú) en `%APPDATA%\minicraft\mundos\<id>\`: solo los chunks modificados, inventario, modo, hora, posición, vida y hambre. Al abrir el juego aparece el **menú** (`src/menu.js`); el mundo que se juega lo elige la dirección de la página (`?mundo=<id>&semilla=N&nombre=…`), y elegir, crear o volver al menú **recarga la página**. Detalle en [docs/03-arquitectura.md](docs/03-arquitectura.md#guardado-en-disco).
+- **Salud** (`src/salud.js`): vida y hambre de 0 a 20 en `player`, daño por caída, muerte (se conserva el inventario) y la manzana como única comida. En creativo no aplica. Detalle en [docs/03-arquitectura.md](docs/03-arquitectura.md#salud-saludjs).
+- **Los ids de mundo** solo admiten `[a-z0-9-]`: `guardado-main.js` los valida porque llegan desde la página y no deben poder salirse de `mundos\`. Cualquier canal IPC nuevo que reciba un id tiene que pasar por `carpetaMundo()`.
+- **No pruebes cambios en archivos del proceso principal** (`main.js`, `guardado-main.js`, `preload.js`) con sabotajes que rompan la sintaxis o lancen errores: Electron muestra un diálogo de error **en la pantalla de Max** y deja colgado el proceso. Usá cambios válidos que alteren el comportamiento, y guardá una copia del archivo antes (`cp`) para restaurar.
+- **Si tocás lo que se guarda:** agregar un campo **opcional** al estado no obliga a subir `VERSION` (los que faltan toman un valor por defecto, como hicieron la salud y el punto de aparición); un cambio de formato incompatible sí: subí `VERSION` en `src/guardado.js` **y** en `guardado-main.js`. En ambos casos actualizá `test/pruebas.js` y `test/pruebas-reinicio.js`. Si cambiás el generador de terreno, los mundos viejos quedan con costuras (solo se guardan los chunks modificados).
+- **Cuando probés el juego a mano con `npm start`, estás usando los mundos reales de Max.** Preguntale antes de construir, romper o borrar cosas ahí. `npm test` usa una carpeta temporal y no los toca.
+- Los chunks modificados se mantienen en memoria en `savedChunks` (`world.js`).
 - Para probar en el navegador integrado, el panel tiene que estar visible; si está oculto no corren los cuadros.
 - La generación de chunks corre en el hilo principal.
 - `npm test` cubre la lógica pero **no ve el aspecto** (colores, texturas, sombras), ni el mouse real, ni el rendimiento en una PC modesta. Si tu cambio toca eso, decí que no lo pudiste verificar en vez de afirmar que anda.

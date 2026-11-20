@@ -52,12 +52,26 @@ async (filtro = '') => {
       for (let y = PY + 1; y <= PY + 3; y++) if (mc.getBlock(x, y, z) !== 0) mc.setBlock(x, y, z, 0);
     }
     mc.setThirdPerson(false); mc.setCreative(false);
+    mc.salud.resetear();                                                       // vida, hambre y el cartel de muerte
     if (mc.CONFIG.quality !== 'media') mc.applyQuality('media');
     mc.inventory.fill(null); mc.invAdd(7, 16); mc.invAdd(8, 8); mc.invAdd(9, 8); mc.selectSlot(0);
     while (mc.drops.length) { const d = mc.drops.pop(); mc.scene.remove(d.mesh); }
     mc.setTime(0.25);
     P.pos.set(CX + 0.5, PY + 1.01, CZ + 0.5); P.vel.set(0, 0, 0);
+    P.fallMax = P.lastY = P.pos.y; P.agotamiento = 0;
     afirmar(await esperar(() => P.onGround, 3000), 'el jugador no quedo apoyado en la plataforma');
+  }
+
+  // El lago mas cercano al origen con al menos 2 bloques de agua y vecinos igual de hondos (para no caer en el borde)
+  function buscarLago() {
+    const mar = mc.CONFIG.seaLevel; let lago = null;
+    for (let x = -1600; x <= 1600; x += 5) for (let z = -1600; z <= 1600; z += 5) {
+      if (mc.heightAt(x, z) > mar - 2) continue;
+      if ([[2, 0], [-2, 0], [0, 2], [0, -2]].some(([dx, dz]) => mc.heightAt(x + dx, z + dz) > mar - 2)) continue;
+      const d = Math.hypot(x, z); if (!lago || d < lago.d) lago = { x, z, d };
+    }
+    afirmar(lago, 'no se encontro un lago con 2 bloques de profundidad');
+    return lago;
   }
 
   // ---------------- arranque y mundo ----------------
@@ -258,16 +272,113 @@ async (filtro = '') => {
     afirmar(await esperar(() => mc.chunks.size >= 225, 15000), `al volver a media hay ${mc.chunks.size} chunks, se esperaban 225`);
   });
 
+  // ---------------- salud ----------------
+  await prueba('salud: una caida de 8 bloques quita 5 de vida y una de 3 no duele', async () => {
+    await arena();
+    P.pos.set(CX + 0.5, PY + 4, CZ + 0.5); P.vel.set(0, 0, 0); P.onGround = false;       // 3 bloques sobre el piso
+    afirmar(await esperar(() => P.onGround && P.pos.y < PY + 2, 3000), 'no aterrizo (3 bloques)');
+    await dormir(200);
+    afirmar(P.vida === 20, `3 bloques quitaron ${20 - P.vida} de vida`);
+    P.pos.set(CX + 0.5, PY + 9, CZ + 0.5); P.vel.set(0, 0, 0); P.onGround = false;       // 8 bloques sobre el piso
+    afirmar(await esperar(() => P.onGround && P.pos.y < PY + 2, 4000), 'no aterrizo (8 bloques)');
+    await dormir(200);
+    afirmar(P.vida === 15, `8 bloques dejaron la vida en ${P.vida}, se esperaba 15`);
+    return 'vida 20 → 15';
+  });
+
+  await prueba('salud: en creativo no hay daño y la barra se oculta', async () => {
+    await arena();
+    mc.setCreative(true);
+    afirmar(mc.salud.danar(5) === false && P.vida === 20, 'el daño paso en creativo');
+    await dormir(100);
+    afirmar(el('estado').style.display === 'none', 'la barra se ve en creativo');
+    mc.setCreative(false); await dormir(100);
+    afirmar(el('estado').style.display === 'flex', 'la barra no vuelve en supervivencia');
+  });
+
+  await prueba('salud: la barra muestra corazones y muslos llenos, medios y vacios', async () => {
+    await arena();
+    P.vida = 7; P.hambre = 13; mc.salud.actualizar(0);
+    const fuentes = id => [...document.querySelectorAll(`#${id} img`)].map(i => i.src);
+    const c = fuentes('corazones'), h = fuentes('hambre');
+    afirmar(c.length === 10 && h.length === 10, 'no hay 10 corazones y 10 muslos');
+    afirmar(c[0] === c[2] && c[3] !== c[0] && c[4] === c[9] && c[4] !== c[3] && c[4] !== c[0], 'la vida 7 no se ve como 3 llenos, 1 medio y 6 vacios');
+    afirmar(h[0] === h[5] && h[6] !== h[0] && h[7] === h[9] && h[7] !== h[6] && h[7] !== h[0], 'el hambre 13 no se ve como 6 llenos, 1 medio y 3 vacios');
+  });
+
+  await prueba('salud: correr y saltar dan hambre, caminar no', async () => {
+    await arena();
+    await apretar('KeyW', 500);
+    afirmar(P.agotamiento === 0, `caminar dio ${P.agotamiento} de agotamiento`);
+    await arena();
+    tecla('ShiftLeft'); await apretar('KeyW', 500); tecla('ShiftLeft', false);
+    afirmar(P.agotamiento > 0.15, `correr dio solo ${P.agotamiento.toFixed(2)}`);
+    const antes = P.agotamiento;
+    await apretar('Space', 150);
+    afirmar(P.agotamiento >= antes + 0.04, `saltar sumo ${(P.agotamiento - antes).toFixed(3)}, se esperaba 0.05`);
+  });
+
+  await prueba('salud: el agotamiento gasta saturacion y despues hambre; con hambre llena regenera; sin comida baja a 1 y no mata', async () => {
+    await arena();
+    P.saturacion = 1; P.hambre = 20; P.agotamiento = 4.5; mc.salud.actualizar(0.01);
+    afirmar(P.saturacion === 0 && P.hambre === 20, `con saturacion: saturacion=${P.saturacion} hambre=${P.hambre}`);
+    P.agotamiento = 4; mc.salud.actualizar(0.01);
+    afirmar(P.hambre === 19, `sin saturacion: hambre=${P.hambre}, se esperaba 19`);
+    P.vida = 10; P.hambre = 20; P.agotamiento = 0; mc.salud.actualizar(4.1);
+    afirmar(P.vida === 11, `regeneracion: vida=${P.vida}, se esperaba 11`);
+    P.vida = 5; P.hambre = 0; P.saturacion = 0; P.agotamiento = 0; mc.salud.actualizar(4.1);
+    afirmar(P.vida === 4, `inanicion: vida=${P.vida}, se esperaba 4`);
+    await dormir(600);                                                                     // pasa la invulnerabilidad de 0.5 s
+    P.vida = 1; mc.salud.actualizar(4.1);
+    afirmar(P.vida === 1 && !P.muerto, `la inanicion mato o bajo de 1 (vida=${P.vida})`);
+  });
+
+  await prueba('salud: comer una manzana llena hambre solo si hay hambre y no se pone como bloque', async () => {
+    await arena();
+    mc.inventory[0] = { id: 11, count: 3 }; mc.selectSlot(0);
+    P.pitch = -1;                                                                          // mira al piso, donde se pondria un bloque
+    P.hambre = 20; mc.mouse.right = true; await dormir(500); mc.mouse.right = false;
+    afirmar(cuenta(11) === 3, 'comio con el hambre llena');
+    afirmar(mc.getBlock(CX, PY + 1, CZ - 1) === 0, 'puso la manzana como si fuera un bloque');
+    P.hambre = 10; mc.mouse.right = true;
+    afirmar(await esperar(() => cuenta(11) === 2, 2000), 'no comio teniendo hambre');
+    mc.mouse.right = false;
+    afirmar(P.hambre === 14, `hambre ${P.hambre}, se esperaba 14`);
+  });
+
+  await prueba('salud: las hojas pueden soltar una manzana', async () => {
+    await arena();
+    const azar = Math.random; Math.random = () => 0;                                       // con 0 siempre "sale" la manzana
+    try {
+      mc.setBlock(CX, PY + 2, CZ - 1, 5);                                                  // hojas a la altura de los ojos
+      mc.mouse.left = true;
+      afirmar(await esperar(() => mc.getBlock(CX, PY + 2, CZ - 1) === 0, 4000), 'no se rompieron las hojas');
+    } finally { Math.random = azar; mc.mouse.left = false; }
+    const ids = mc.drops.map(d => d.id);
+    afirmar(ids.includes(11), `no solto manzana (soltó: ${ids.join(',') || 'nada'})`);
+    afirmar(ids.includes(5), 'no solto las hojas');
+  });
+
+  await prueba('salud: morir muestra el cartel, conserva el inventario y reaparece en el inicio', async () => {
+    await arena();
+    mc.inventory[5] = { id: 4, count: 9 };
+    afirmar(mc.salud.danar(25, 'caida') === true, 'no recibio el daño');
+    afirmar(P.muerto && P.vida === 0, 'no murio');
+    afirmar(el('muerte').style.display === 'flex', 'no aparecio el cartel de muerte');
+    afirmar(/caíste/.test(el('muerteCausa').textContent), `el cartel dice "${el('muerteCausa').textContent}"`);
+    el('reaparecerBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    afirmar(!P.muerto && P.vida === 20 && P.hambre === 20 && el('muerte').style.display === 'none', 'no reaparecio con la salud completa');
+    afirmar(cuenta(4) === 9 && cuenta(7) === 16, 'se perdio el inventario');
+    const s = P.spawn;
+    afirmar(await esperar(() => cerca(P.pos.x, s.x, 0.6) && cerca(P.pos.z, s.z, 0.6), 3000), `no volvio al inicio (${P.pos.x.toFixed(1)}, ${P.pos.z.toFixed(1)})`);
+    afirmar(await esperar(() => P.onGround, 15000), 'no quedo apoyado en el inicio');
+    afirmar(P.vida === 20, `perdio vida al reaparecer: ${P.vida}`);
+  });
+
   // ---------------- agua y persistencia (viajan lejos: van al final) ----------------
   await prueba('nadar: pantalla azul bajo el agua y subir con Espacio', async () => {
     await arena();
-    const mar = mc.CONFIG.seaLevel; let lago = null;
-    for (let x = -1600; x <= 1600; x += 5) for (let z = -1600; z <= 1600; z += 5) {
-      if (mc.heightAt(x, z) > mar - 2) continue;
-      if ([[2, 0], [-2, 0], [0, 2], [0, -2]].some(([dx, dz]) => mc.heightAt(x + dx, z + dz) > mar - 2)) continue;   // que no sea el borde
-      const d = Math.hypot(x, z); if (!lago || d < lago.d) lago = { x, z, d };
-    }
-    afirmar(lago, 'no se encontro un lago con 2 bloques de profundidad');
+    const mar = mc.CONFIG.seaLevel, lago = buscarLago();
     P.pos.set(lago.x + 0.5, mar + 4, lago.z + 0.5); P.vel.set(0, 0, 0);
     afirmar(await esperar(() => P.inWater, 15000), 'el jugador no entro al agua');
     afirmar(await esperar(() => el('water').style.display === 'block', 5000), 'no aparecio la pantalla azul bajo el agua');
@@ -275,6 +386,15 @@ async (filtro = '') => {
     await apretar('Space', 1500);
     afirmar(P.pos.y > y0 + 0.5, `subio solo ${(P.pos.y - y0).toFixed(2)} bloques`);
     return `lago en (${lago.x}, ${lago.z})`;
+  });
+
+  await prueba('salud: caer al agua desde 10 bloques no duele', async () => {
+    await arena();
+    const mar = mc.CONFIG.seaLevel, lago = buscarLago();
+    P.pos.set(lago.x + 0.5, mar + 10, lago.z + 0.5); P.vel.set(0, 0, 0); P.fallMax = P.lastY = P.pos.y;
+    afirmar(await esperar(() => P.inWater, 15000), 'el jugador no entro al agua');
+    await dormir(1500);                                                        // se asienta en el fondo
+    afirmar(P.vida === 20, `la vida es ${P.vida}: el agua no amortiguo la caida`);
   });
 
   await prueba('lo construido se conserva al alejarse y volver', async () => {
@@ -289,6 +409,35 @@ async (filtro = '') => {
     afirmar(mc.getBlock(CX + 3, PY + 3, CZ - 4) === 8, 'la torre desaparecio');
     afirmar(mc.getBlock(CX + 4, PY, CZ + 4) === 0, 'el hoyo desaparecio');
     return `${mc.savedChunks.size} chunk(s) guardados`;
+  });
+
+  // ---------------- guardado en disco ----------------
+  // Tiene que ser la ULTIMA: deja un estado conocido guardado y test/run.js reinicia el juego para comprobarlo
+  // con test/pruebas-reinicio.js. Si cambias algo de aca, cambia lo mismo alla.
+  await prueba('guardar: escribe el mundo, el inventario, el modo, la hora y la posicion', async () => {
+    await arena();
+    mc.setBlock(CX + 4, PY, CZ + 4, 0);                                        // hoyo en la plataforma
+    for (let y = PY + 1; y <= PY + 3; y++) mc.setBlock(CX + 3, y, CZ - 4, 8);  // torre
+    mc.inventory[3] = { id: 2, count: 33 }; mc.inventory[12] = { id: 5, count: 7 };
+    mc.selectSlot(3);
+    mc.setCreative(true);
+    mc.setTime(0.6);
+    P.yaw = 1.2; P.pitch = -0.3;
+    P.vida = 13; P.hambre = 7; P.saturacion = 2;                               // en creativo los valores se conservan
+    afirmar(await mc.guardarAhora(), 'guardarAhora fallo (¿no hay window.guardado?)');
+    afirmar(mc.mundoId === 'prueba', `el mundo de las pruebas es "${mc.mundoId}"`);
+    const e = await window.guardado.cargar(mc.mundoId);                        // se vuelve a leer lo que quedo en el disco
+    afirmar(e && e.version === 1, 'no se pudo volver a leer el archivo guardado');
+    afirmar(e.semilla === 1337 && e.creativo === true && e.seleccionado === 3, 'semilla, modo o ranura mal guardados');
+    afirmar(e.vida === 13 && e.hambre === 7 && e.saturacion === 2, `salud mal guardada: ${e.vida}/${e.hambre}/${e.saturacion}`);
+    afirmar(e.spawn && Number.isFinite(e.spawn.x) && Number.isFinite(e.spawn.y), 'no se guardo el punto de aparicion');
+    afirmar(e.nombre === 'Mundo de prueba', `el nombre guardado es "${e.nombre}"`);
+    afirmar(e.inventario[3] && e.inventario[3].count === 33, 'el inventario no se guardo');
+    const c = e.chunks.find(c => c.cx === Math.floor(CX / 16) && c.cz === Math.floor(CZ / 16));
+    afirmar(c, 'el chunk de la plataforma no esta en el archivo');
+    afirmar(c.data instanceof Uint8Array && c.data.length === 16 * 64 * 16, 'los datos del chunk no son un Uint8Array de 16384 bytes');
+    afirmar(c.data[(PY + 3) * 256 + ((CZ - 4) & 15) * 16 + ((CX + 3) & 15)] === 8, 'la torre no esta en los datos guardados');
+    return `${e.chunks.length} chunk(s) modificados en el archivo`;
   });
 
   return resultados;

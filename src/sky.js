@@ -162,4 +162,4 @@ function updateSky(dt) {
   }
 }
 
-export { skyMesh, updateSky, daylight, setTime, skipTime, clockString };
+export { skyMesh, updateSky, daylight, dayT, setTime, skipTime, clockString };

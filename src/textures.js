@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { BLOCKS } from './config.js';
 
-const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 11;
+const TILE = 32, PAD = 8, CELL = TILE + 2 * PAD, NTILES = 12;
 
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = NTILES * CELL;
@@ -167,6 +167,14 @@ paint(10, (x, y) => {                                                           
   g *= 1.1 - w.f1 * 0.3;
   if (w.f2 - w.f1 < 0.1) g *= 0.5;
   return [g, g, g + 4];
+});
+paint(11, (x, y) => {                                                             // manzana (se ve como un cubo rojo hasta tener objetos planos)
+  let c = lerpC([150, 20, 22], [214, 48, 40], 1 - Math.min(1, Math.hypot(x - 15.5, y - 17) / 22));
+  c = mulC(c, 0.92 + rnd(x, y, 110) * 0.14);
+  if (Math.hypot(x - 10, y - 11) < 4) c = lerpC(c, [255, 190, 180], 0.55);        // brillo
+  if (x >= 15 && x <= 16 && y < 7) c = [80, 50, 25];                              // tallo
+  if (x >= 17 && x <= 21 && y >= 3 && y <= 5) c = [60, 140, 40];                  // hoja
+  return c;
 });
 
 const atlasTexture = new THREE.CanvasTexture(atlasCanvas);
