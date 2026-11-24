@@ -152,7 +152,7 @@ Salen de leer el código el 2026-11-20 (no de medir). **Hechos ese día:** volar
 5. **Menú de opciones y sonido** (ver "Ideas adicionales").
 6. **Una política de contenido (CSP)** en `index.html`, que quizá no sirva mientras los mods corran en la página.
 7. **Contenido que más cambia la sensación de juego:** horno, antorchas y carbón; cultivos y más comida; ovejas y gallinas; creeper y esqueleto; armaduras; cofres; ríos, océanos y lava.
-8. **La prueba inestable:** una corrida de `npm test` dio 91 de 92 y la siguiente 92 de 92 sin cambiar nada; no se supo cuál falló (la salida se recortó con `tail`). En otra corrida falló "mobs: pegarle…" sin relación con lo que se estaba cambiando: es el sospechoso (no confirmado). Guardar siempre la salida completa (`npm test > salida.txt`).
+8. ~~**La prueba inestable**~~ **(arreglada el 2026-11-20):** era "mobs: pegarle…". Miraba si se estaba rompiendo el bloque de atrás *después* de esperar el golpe; para entonces el cerdo ya salió empujado y el rayo apunta al bloque (comportamiento normal del juego), así que según los cuadros que pasaran fallaba. Ahora mira cuadro a cuadro hasta el golpe. Se comprobó con un sabotaje (si el mob no anula el bloque de atrás, la prueba falla) y 5 corridas seguidas verdes. Lección: **guardar siempre la salida completa** (`npm test > salida.txt`), no recortarla con `tail`.
 
 ## Requisito transversal: rendimiento
 

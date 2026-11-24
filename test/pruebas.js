@@ -733,12 +733,22 @@ async (filtro = '') => {
     const cerdo = quietoEn('cerdo', 0, -2);
     afirmar(await esperar(() => cerdo.onGround, 2000), 'el cerdo no aterrizó');
     const enFrente = () => { cerdo.pos.set(CX + 0.5, PY + 1.01, CZ - 1.8); cerdo.vel.set(0, 0, 0); cerdo.huir = 0; cerdo.caminando = false; cerdo.t = 1000; P.yaw = 0; P.pitch = -0.53; };
-    const pegar = async () => { enFrente(); const antes = cerdo.vida; mc.mouse.left = true; const ok = await esperar(() => cerdo.vida !== antes, 1500); mc.mouse.left = false; return ok; };
+    // `minoDetras`: si en algun cuadro ANTES del golpe (o en el cuadro del golpe) se estaba rompiendo el bloque de atras. Se mira cuadro a cuadro
+    // y se deja de mirar al pegar: despues del golpe el cerdo sale empujado, el rayo puede pasar a apuntar al bloque de atras y eso es normal
+    // (la version anterior miraba despues de la espera y fallaba a veces segun cuantos cuadros pasaran).
+    let minoDetras = false;
+    const pegar = async () => {
+      enFrente(); const antes = cerdo.vida; minoDetras = false; let vigilando = true;
+      const vigia = () => { if (!vigilando) return; if (mc.mining.active) minoDetras = true; if (cerdo.vida === antes) requestAnimationFrame(vigia); };
+      mc.mouse.left = true; requestAnimationFrame(vigia);
+      const ok = await esperar(() => cerdo.vida !== antes, 1500);
+      vigilando = false; mc.mouse.left = false; return ok;
+    };
     // con la mano
     mc.selectSlot(8);
     afirmar(await pegar(), 'el click sobre el cerdo no lo golpeó');
     afirmar(cerdo.vida === 9, `con la mano el cerdo quedó con ${cerdo.vida}, se esperaba 9`);
-    afirmar(!mc.mining.active && mc.mining.p === 0, 'al golpear al cerdo también se estaba rompiendo el bloque de atrás');
+    afirmar(!minoDetras, 'al golpear al cerdo también se estaba rompiendo el bloque de atrás');
     afirmar(cerdo.huir > 0 && cerdo.golpe > 0, 'el cerdo no huye ni se pone rojo al golpearlo');
     afirmar(await esperar(() => Math.hypot(cerdo.vel.x, cerdo.vel.z) > 1, 600), 'el golpe no lo empujó');
     await dormir(600);
